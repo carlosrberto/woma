@@ -22,7 +22,7 @@
 # RELEASING (run in order):
 #   make bump-patch     1. Bump the version (pick patch/minor/major)
 #   make prepare        2. Check, update CHANGELOG.md, commit
-#   make release        3. Tag, push, GitHub release, Homebrew formula
+#   make release        3. Tag, push, GitHub release with binaries, Homebrew formula
 #
 # For the very first release (already at 0.1.0), skip the bump.
 #
@@ -39,6 +39,7 @@ CUR_VERSION = $(shell sed -n 's/^var version = "\(.*\)"$$/\1/p' main.go)
 TAP ?= ../homebrew-tap
 GH_USER ?= carlosrberto
 STATICCHECK ?= $(shell go env GOPATH)/bin/staticcheck
+PLATFORMS = darwin/arm64 darwin/amd64 linux/arm64 linux/amd64
 
 export TAP GH_USER
 
@@ -61,6 +62,19 @@ lint: ## gofmt, go vet, staticcheck and shellcheck
 
 check: lint test ## Lint, then test
 
+dist: ## Build the release archives and checksums.txt into dist/
+	@rm -rf dist && mkdir -p dist
+	@for p in $(PLATFORMS); do \
+		os=$${p%/*}; arch=$${p#*/}; name=$(APP_NAME)_$(CUR_VERSION)_$${os}_$${arch}; \
+		mkdir -p dist/$$name && \
+		CGO_ENABLED=0 GOOS=$$os GOARCH=$$arch go build -trimpath \
+			-ldflags "-s -w -X main.version=$(CUR_VERSION)" -o dist/$$name/$(APP_NAME) . && \
+		cp LICENSE README.md dist/$$name/ && \
+		tar -czf dist/$$name.tar.gz -C dist $$name && rm -rf dist/$$name && \
+		echo "Created dist/$$name.tar.gz" || exit 1; \
+	done
+	@cd dist && shasum -a 256 *.tar.gz > checksums.txt
+
 # --- Release ---
 
 release-notes: ## Show the release notes from commits since the last tag
@@ -82,7 +96,7 @@ prepare: ## Check, update CHANGELOG.md, commit "chore(release): vX"
 	git commit -m "chore(release): v$(CUR_VERSION)"
 	@echo "Ready. Run 'make release' to tag and publish."
 
-release: ## Tag, push, create the GitHub release, update the Homebrew formula
+release: ## Tag, push, create the GitHub release with binaries, update the Homebrew formula
 	scripts/release.sh
 
 undo-release: ## Undo the last release: GitHub release, tag, release commit, formula
@@ -90,6 +104,7 @@ undo-release: ## Undo the last release: GitHub release, tag, release commit, for
 	-@if [ -n "$(GH_USER)" ]; then GH_TOKEN=$$(gh auth token --user $(GH_USER)); export GH_TOKEN; fi; \
 		gh release delete "v$(CUR_VERSION)" --yes --cleanup-tag
 	-@git tag -d "v$(CUR_VERSION)" 2>/dev/null
+	-@rm -rf dist
 	@if [ "$$(git log -1 --format=%s)" = "chore(release): v$(CUR_VERSION)" ]; then \
 		echo "Dropping the 'chore(release): v$(CUR_VERSION)' commit and rewinding origin…"; \
 		git reset --hard HEAD~1 && \
@@ -143,5 +158,5 @@ hooks: ## Install git hooks (pre-push runs the tests)
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-14s\033[0m %s\n", $$1, $$2}'
 
-.PHONY: build install test lint check release-notes prepare release undo-release formula bump-patch bump-minor bump-major version setup hooks help
+.PHONY: build install test lint check dist release-notes prepare release undo-release formula bump-patch bump-minor bump-major version setup hooks help
 .DEFAULT_GOAL := help

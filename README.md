@@ -41,11 +41,8 @@ woma  ~/code
 
 ## Install
 
-woma is built from source on your machine, so there's nothing to sign:
-macOS runs it without a security prompt.
-
-With Homebrew, on macOS or Linux (it gets Go to build woma, so it takes a
-minute or so):
+With Homebrew, on macOS or Linux (it installs the release's prebuilt
+binary, so it takes seconds):
 
 ```sh
 brew install carlosrberto/tap/woma
@@ -68,6 +65,12 @@ make build && ln -sf "$PWD/woma" ~/.local/bin/woma
 
 `brew install --HEAD carlosrberto/tap/woma` builds the latest `main` with
 Homebrew instead of the latest release.
+
+The binaries are also on [the releases](https://github.com/carlosrberto/woma/releases)
+(macOS and Linux, arm64 and amd64; check them against `checksums.txt`).
+They aren't signed by Apple: on macOS, a binary your browser downloaded
+is quarantined and refused, and `xattr -d com.apple.quarantine woma`
+allows it (`curl -LO` and Homebrew don't quarantine).
 
 woma needs `git` on your `PATH`. Then add the [shell
 integration](#shell-integration-wcd-and-wnew) for `wcd` and `wnew`.

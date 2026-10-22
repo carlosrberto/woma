@@ -1,9 +1,8 @@
 #!/bin/sh
-# Publishes the version `make prepare` committed: tags it, pushes, creates
-# the GitHub release with notes from CHANGELOG.md, then writes the Homebrew
-# formula into the tap and pushes it. Run by `make release`. The release
-# has no binaries: unsigned ones are refused by macOS, and Homebrew and go
-# install build from source.
+# Publishes the version `make prepare` committed: builds the binaries
+# (`make dist`), tags, pushes, creates the GitHub release with notes from
+# CHANGELOG.md and the binaries, then writes the Homebrew formula (which
+# downloads them) into the tap and pushes it. Run by `make release`.
 #
 #   TAP      the tap's clone (default ../homebrew-tap)
 #   GH_USER  the gh account to publish with (default carlosrberto; empty
@@ -41,15 +40,18 @@ if [ -n "$gh_user" ]; then
 	export GH_TOKEN
 fi
 
+make dist
+
 # One push for main and the tag, so the pre-push tests run once.
 git tag -a "$tag" -m "Release $tag"
 git push --follow-tags origin main
 
-gh release create "$tag" --title "$tag" --notes "$notes"
+gh release create "$tag" dist/*.tar.gz dist/checksums.txt --title "$tag" --notes "$notes"
 
 echo "release: writing the formula into $tap"
 mkdir -p "$tap/Formula"
-scripts/formula.sh "$tag" >"$tap/Formula/woma.rb"
+scripts/formula.sh "$tag" dist/checksums.txt >"$tap/Formula/woma.rb"
+rm -rf dist
 git -C "$tap" add Formula/woma.rb
 git -C "$tap" commit -qm "woma $version"
 git -C "$tap" push -q

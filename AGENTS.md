@@ -107,6 +107,6 @@ remote branch (e.g. `origin/main`) as bringing no commits. Reflogs expire
   (co-author trailers, "generated with" notes): the user's hooks reject
   the commit.
 - Releases: `make bump-patch|minor|major`, `make prepare`, `make release`
-  (tag, GitHub release with notes, Homebrew formula in
-  `carlosrberto/homebrew-tap`, built from source - no binaries).
+  (tag, GitHub release with notes and unsigned binaries from `make dist`,
+  Homebrew formula in `carlosrberto/homebrew-tap` that installs them).
   `docs/releasing.md` has the details.
