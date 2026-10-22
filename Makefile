@@ -11,7 +11,7 @@
 # DAILY DEVELOPMENT:
 #   make build          Build ./woma (what ~/.local/bin/woma can link to)
 #   make test           Run the tests (race detector on)
-#   make check          gofmt, go vet, shellcheck, then the tests
+#   make check          gofmt, go vet, staticcheck, shellcheck, then the tests
 #
 # VERSIONING:
 #   make version        Show the current version
@@ -38,6 +38,7 @@ APP_NAME = woma
 CUR_VERSION = $(shell sed -n 's/^var version = "\(.*\)"$$/\1/p' main.go)
 TAP ?= ../homebrew-tap
 GH_USER ?= carlosrberto
+STATICCHECK ?= $(shell go env GOPATH)/bin/staticcheck
 
 export TAP GH_USER
 
@@ -52,9 +53,10 @@ install: ## Build and install into $(go env GOPATH)/bin
 test: ## Run the tests (race detector on)
 	go test -race ./...
 
-lint: ## gofmt, go vet and shellcheck
+lint: ## gofmt, go vet, staticcheck and shellcheck
 	@test -z "$$(gofmt -l .)" || { gofmt -l .; echo "gofmt: the files above need formatting" >&2; exit 1; }
 	go vet ./...
+	$(STATICCHECK) ./...
 	shellcheck scripts/*.sh .githooks/pre-push
 
 check: lint test ## Lint, then test

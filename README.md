@@ -394,7 +394,7 @@ install = ""
 ```sh
 make setup           # once: git hooks (pre-push runs the tests)
 make test            # run the tests
-make check           # gofmt, go vet, shellcheck, then the tests
+make check           # gofmt, go vet, staticcheck, shellcheck, then the tests
 make build           # build ./woma
 go run . ~/code      # run without installing
 ```
