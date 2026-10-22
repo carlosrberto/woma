@@ -61,6 +61,18 @@ macOS a binary your browser downloaded is quarantined and refused:
 `xattr -d com.apple.quarantine woma` allows it (`curl -LO` doesn't
 quarantine).
 
+From a clone (to try a change, or before a release), with Go 1.24+:
+
+```sh
+git clone https://github.com/carlosrberto/woma && cd woma
+go install .                                  # puts `woma` in $(go env GOPATH)/bin
+# or build it in place and link it onto your PATH:
+go build -o woma . && ln -sf "$PWD/woma" ~/.local/bin/woma
+```
+
+`brew install --HEAD carlosrberto/tap/woma` builds the latest `main` with
+Homebrew instead of the latest release.
+
 woma needs `git` on your `PATH`. Then add the [shell
 integration](#shell-integration-wcd-and-wnew) for `wcd` and `wnew`.
 

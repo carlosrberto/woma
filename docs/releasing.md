@@ -14,15 +14,29 @@ Linux, and for direct downloads.
 
 ## Once
 
-1. **The repo**: push this one to `carlosrberto/woma`, public. A private
-   repo's source archives need a token, so `brew install` fails, and
-   `go install` can't fetch the module.
-2. **The tap**: the public repo `carlosrberto/homebrew-tap` (shared with
-   other tools), cloned next to this one (`../homebrew-tap`). The formula
-   is `Formula/woma.rb` in it; `brew install carlosrberto/tap/woma` finds
-   it there.
-3. **goreleaser**: `brew install goreleaser`. `goreleaser check`
-   validates the config.
+1. **The repo**: woma on GitHub, public. A private repo's source archives
+   need a token, so `brew install` fails, and `go install` can't fetch
+   the module.
+
+   ```sh
+   gh repo create carlosrberto/woma --public --source . --push
+   ```
+
+2. **The tap**: `carlosrberto/homebrew-tap`, public, shared with other
+   tools (tux's formula goes there too), cloned next to this one. The
+   formula is `Formula/woma.rb` in it; `brew install
+   carlosrberto/tap/woma` finds it there (the `homebrew-` prefix is what
+   makes the short name work).
+
+   ```sh
+   cd .. && gh repo create carlosrberto/homebrew-tap --public --clone
+   mkdir -p homebrew-tap/Formula
+   ```
+
+   If it exists already: `gh repo clone carlosrberto/homebrew-tap` next
+   to this repo.
+3. **goreleaser** (only for the release's binaries): `brew install
+   goreleaser`. `goreleaser check` validates the config.
 
 ## A release
 
