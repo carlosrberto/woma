@@ -3,6 +3,8 @@ package tui
 
 import (
 	"context"
+	"errors"
+	"runtime"
 	"sync/atomic"
 	"time"
 
@@ -13,6 +15,7 @@ import (
 
 	"woma/internal/config"
 	"woma/internal/core"
+	"woma/internal/fsutil"
 	"woma/internal/git"
 )
 
@@ -43,7 +46,8 @@ func (s sortMode) String() string {
 type item struct {
 	e         core.Entry
 	name      string // path shown in the list
-	inspected bool
+	inspected bool   // git status known (needed before deleting)
+	measured  bool   // size and file activity known
 	selected  bool
 
 	// Deletion state. started and freed are written by delete workers.
@@ -57,8 +61,9 @@ type item struct {
 func (it *item) wt() git.Worktree { return it.e.WT }
 
 type group struct {
-	repo  *git.Repo
-	items []*item
+	repo    *git.Repo
+	items   []*item
+	current bool // the repository woma was started in; listed first
 }
 
 // row is a line of the list: a repository header when item is nil.
@@ -68,14 +73,31 @@ type row struct {
 }
 
 type (
-	scanDoneMsg struct {
-		repos []git.Repo
-		err   error
+	// envelope wraps messages streamed from a scan, so ones from a scan
+	// that was replaced by a rescan can be dropped.
+	envelope struct {
+		gen int
+		msg tea.Msg
 	}
-	inspectMsg struct {
+	repoMsg struct {
+		repo    git.Repo
+		current bool
+	}
+	scanDoneMsg struct {
+		err error
+	}
+	// statusMsg and sizeMsg carry the two halves of inspecting a worktree:
+	// the quick git checks and the slow disk walk. initial marks the ones
+	// counted in the scan's progress.
+	statusMsg struct {
 		it      *item
-		e       core.Entry
-		initial bool // part of the scan, counted in the progress bar
+		status  git.Status
+		initial bool
+	}
+	sizeMsg struct {
+		it      *item
+		stats   fsutil.Stats
+		initial bool
 	}
 	deleteMsg struct {
 		it *item
@@ -125,20 +147,33 @@ type Model struct {
 	scan          *git.ScanProgress
 	err           error
 
-	groups     []*group
-	rows       []row
-	cursor     int
-	offset     int
-	sort       sortMode
-	showDetail bool
+	groups []*group
+	rows   []row
+	cursor int
+	offset int
+	// cursorMoved is set once the user navigates; until then the cursor
+	// stays on the first row while repositories stream in.
+	cursorMoved bool
+	sort        sortMode
+	showDetail  bool
 
 	search    textinput.Model
 	searching bool
 	filter    string
 
-	inspectCh    chan inspectMsg
-	inspectTotal int
-	inspectDone  int
+	// Streaming scan state. Events from goroutines arrive on events; gen
+	// identifies the current scan.
+	gen        int
+	events     chan tea.Msg
+	scanCtx    context.Context
+	scanCancel context.CancelFunc
+	scanning   bool
+	gitSem     chan struct{}
+	sizeSem    chan struct{}
+	checkTotal int
+	checkDone  int
+	sizeTotal  int
+	sizeDone   int
 
 	deleteCh     chan deleteMsg
 	deleting     []*item
@@ -205,22 +240,138 @@ func (m *Model) Init() tea.Cmd {
 	return tea.Batch(m.spinner.Tick, m.startScan())
 }
 
+// startScan (re)starts scanning. Repositories stream in as they are found
+// (the one woma was started in first) and each worktree is inspected right
+// away: git checks and disk usage run in separate pools so labels don't wait
+// for sizes.
 func (m *Model) startScan() tea.Cmd {
-	ctx, roots, progress := m.ctx, m.opts.Roots, m.scan
+	if m.scanCancel != nil {
+		m.scanCancel()
+	}
+	ctx, cancel := context.WithCancel(m.ctx)
+	m.scanCtx, m.scanCancel = ctx, cancel
+	m.gen++
+	m.events = make(chan tea.Msg)
+	m.scanning = true
+	m.scan = &git.ScanProgress{}
+	m.state = stateScanning
+	m.groups, m.rows = nil, nil
+	m.checkTotal, m.checkDone, m.sizeTotal, m.sizeDone = 0, 0, 0, 0
+	m.gitSem = make(chan struct{}, runtime.NumCPU())
+	m.sizeSem = make(chan struct{}, max(2, runtime.NumCPU()/2))
+
+	events, roots, progress := m.events, m.opts.Roots, m.scan
 	opts := git.ScanOptions{Ignore: m.opts.Config.Ignore, MaxDepth: m.opts.Config.MaxDepth}
-	return func() tea.Msg {
-		repos, err := git.Discover(ctx, roots, opts, progress)
-		return scanDoneMsg{repos, err}
+	go func() {
+		err := git.DiscoverEach(ctx, roots, opts, progress, func(r git.Repo, current bool) {
+			send(ctx, events, repoMsg{r, current})
+		})
+		send(ctx, events, scanDoneMsg{err})
+	}()
+	return tea.Batch(m.listen(), m.startSpinner())
+}
+
+// send delivers msg unless the scan was cancelled.
+func send(ctx context.Context, events chan<- tea.Msg, msg tea.Msg) {
+	select {
+	case events <- msg:
+	case <-ctx.Done():
 	}
 }
 
-func waitFor[T any](ch <-chan T) tea.Cmd {
-	return func() tea.Msg { return <-ch }
+// acquire takes a slot of sem, or reports false if the scan was cancelled.
+func acquire(ctx context.Context, sem chan struct{}) bool {
+	select {
+	case sem <- struct{}{}:
+		return true
+	case <-ctx.Done():
+		return false
+	}
+}
+
+// listen waits for the next event of the current scan.
+func (m *Model) listen() tea.Cmd {
+	events, gen := m.events, m.gen
+	return func() tea.Msg { return envelope{gen, <-events} }
+}
+
+// streaming reports whether more scan events are expected.
+func (m *Model) streaming() bool {
+	return m.scanning || m.checkDone < m.checkTotal || m.sizeDone < m.sizeTotal
+}
+
+// inspect starts the git checks and the size measurement of a new item.
+func (m *Model) inspect(it *item) {
+	ctx, events, gitSem, sizeSem := m.scanCtx, m.events, m.gitSem, m.sizeSem
+	repo, wt := it.e.Repo, it.e.WT
+	m.checkTotal++
+	go func() {
+		if !acquire(ctx, gitSem) {
+			return
+		}
+		status := git.Inspect(ctx, repo, wt)
+		<-gitSem
+		send(ctx, events, statusMsg{it, status, true})
+	}()
+	if wt.Prunable {
+		it.measured = true
+		return
+	}
+	m.sizeTotal++
+	go func() {
+		if !acquire(ctx, sizeSem) {
+			return
+		}
+		stats := fsutil.Measure(ctx, wt.Path)
+		<-sizeSem
+		send(ctx, events, sizeMsg{it, stats, true})
+	}()
+}
+
+// handleEvent applies a scan or inspection result.
+func (m *Model) handleEvent(msg tea.Msg) tea.Cmd {
+	switch msg := msg.(type) {
+	case repoMsg:
+		m.addRepo(msg.repo, msg.current)
+		if m.state == stateScanning {
+			m.state = stateList
+		}
+	case scanDoneMsg:
+		m.scanning = false
+		if msg.err != nil && !errors.Is(msg.err, context.Canceled) {
+			m.err = msg.err
+			return tea.Quit
+		}
+		if m.state == stateScanning {
+			m.state = stateList
+		}
+	case statusMsg:
+		// Only take what inspection found: the worktree itself (path, lock)
+		// may have changed through an action since the job started.
+		msg.it.e.Status, msg.it.inspected = msg.status, true
+		if msg.initial {
+			m.checkDone++
+		}
+		if m.sort == sortActivity {
+			m.sortItems()
+			m.rebuildRows()
+		}
+	case sizeMsg:
+		msg.it.e.Size, msg.it.e.Newest, msg.it.measured = msg.stats.Size, msg.stats.Newest, true
+		if msg.initial {
+			m.sizeDone++
+		}
+		if m.sort != sortName {
+			m.sortItems()
+			m.rebuildRows()
+		}
+	}
+	return nil
 }
 
 func (m *Model) busy() bool {
 	return m.state == stateScanning ||
-		m.inspectDone < m.inspectTotal ||
+		m.streaming() ||
 		m.opRunning != "" ||
 		(m.state == stateDeleting && !m.finished)
 }
@@ -250,31 +401,18 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.spinner, cmd = m.spinner.Update(msg)
 		return m, cmd
 
-	case scanDoneMsg:
-		if msg.err != nil {
-			m.err = msg.err
-			return m, tea.Quit
+	case envelope:
+		if msg.gen != m.gen {
+			return m, nil // from a scan that was replaced
 		}
-		m.buildGroups(msg.repos)
-		m.state = stateList
-		return m, m.startInspecting()
+		cmd := m.handleEvent(msg.msg)
+		if m.streaming() {
+			cmd = tea.Batch(cmd, m.listen())
+		}
+		return m, cmd
 
-	case inspectMsg:
-		// Only take what inspection measured: the worktree itself (path,
-		// lock) may have changed through an action since the job started.
-		it := msg.it
-		it.e.Size, it.e.Newest, it.e.Status, it.inspected = msg.e.Size, msg.e.Newest, msg.e.Status, true
-		if msg.initial {
-			m.inspectDone++
-		}
-		if m.sort != sortName {
-			m.sortItems()
-			m.rebuildRows()
-		}
-		if msg.initial && m.inspectDone < m.inspectTotal {
-			return m, waitFor(m.inspectCh)
-		}
-		return m, nil
+	case statusMsg, sizeMsg: // refreshes after an action
+		return m, m.handleEvent(msg)
 
 	case deleteMsg:
 		return m, m.finishDelete(msg)

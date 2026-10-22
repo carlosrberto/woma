@@ -72,9 +72,19 @@ woma                          # scan the current directory (or configured roots)
 woma ~/code ~/work            # scan specific folders
 ```
 
-On start woma shows live scan progress (folders visited, repositories found).
-The list appears as soon as scanning ends; sizes, activity and git status fill
-in as each worktree is inspected, with a progress bar at the top.
+woma shows worktrees as fast as it can find them:
+
+1. If you start it inside a repository (or any folder of one), that
+   repository's worktrees appear immediately, pinned to the top, since git
+   already knows them.
+2. Meanwhile it scans the folders below, nearest first and in parallel, and
+   adds each repository to the list as soon as it is found.
+3. Each worktree's git status (labels) and its disk size are worked out
+   separately, so labels don't wait for slow size calculations. Values still
+   being worked out show as `…`; the header shows the progress.
+
+The cursor stays on the first row while the list fills in, until you move
+it. Deleting a worktree waits until its git status is known.
 
 Worktrees are grouped by repository. Each row shows the folder, branch, time
 since last activity (newest commit or file change), disk size and

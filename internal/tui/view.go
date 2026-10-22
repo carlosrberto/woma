@@ -60,7 +60,7 @@ func sizeLabel(items []*item) string {
 	pending := false
 	for _, it := range items {
 		total += it.e.Size
-		pending = pending || !it.inspected
+		pending = pending || !it.measured
 	}
 	if pending {
 		return HumanBytes(total) + "…"
@@ -73,10 +73,17 @@ func (m *Model) viewList() string {
 	b.WriteString(m.title() + "\n")
 
 	all := m.allItems()
-	stats := fmt.Sprintf("%d worktrees in %d repositories · %s", len(all), len(m.groups), sizeLabel(all))
-	if m.inspectDone < m.inspectTotal {
-		stats += fmt.Sprintf("  %sinspecting %s %d/%d", m.spinner.View(),
-			m.bar.ViewAs(float64(m.inspectDone)/float64(m.inspectTotal)), m.inspectDone, m.inspectTotal)
+	stats := fmt.Sprintf("%d %s in %d %s · %s", len(all), plural(len(all), "worktree"),
+		len(m.groups), plural(len(m.groups), "repository", "repositories"), sizeLabel(all))
+	switch {
+	case m.scanning:
+		stats += fmt.Sprintf("  %sscanning %d folders", m.spinner.View(), m.scan.Dirs.Load())
+	case m.checkDone < m.checkTotal:
+		stats += fmt.Sprintf("  %schecking git %d/%d", m.spinner.View(), m.checkDone, m.checkTotal)
+	}
+	if !m.scanning && m.sizeDone < m.sizeTotal {
+		stats += fmt.Sprintf("  measuring %s %d/%d",
+			m.bar.ViewAs(float64(m.sizeDone)/float64(m.sizeTotal)), m.sizeDone, m.sizeTotal)
 	}
 	b.WriteString(styles.dim.Render(stats) + "\n")
 	switch {
@@ -191,7 +198,7 @@ func sizeCell(it *item) string {
 	switch {
 	case it.wt().Prunable:
 		return styles.dim.Render(fmt.Sprintf("%*s", sizeWidth, "—"))
-	case !it.inspected:
+	case !it.measured:
 		return styles.dim.Render(fmt.Sprintf("%*s", sizeWidth, "…"))
 	}
 	return styles.size.Render(fmt.Sprintf("%*s", sizeWidth, HumanBytes(it.e.Size)))
@@ -265,7 +272,11 @@ func (m *Model) viewDetail() string {
 		if s.Subject != "" {
 			field("commit", s.Subject+styles.dim.Render(" · "+ago(s.LastCommit, now)))
 		}
-		field("active", ago(e.LastActivity(), now)+styles.dim.Render(" · ")+HumanBytes(e.Size))
+		size := "measuring…"
+		if it.measured {
+			size = HumanBytes(e.Size)
+		}
+		field("active", ago(e.LastActivity(), now)+styles.dim.Render(" · ")+size)
 		if len(s.Changes) > 0 {
 			changes := strings.Join(s.Changes, styles.dim.Render(" · "))
 			if s.NumChanges > len(s.Changes) {

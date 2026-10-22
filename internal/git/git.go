@@ -7,7 +7,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -76,95 +75,13 @@ func (o ScanOptions) skip(name string) bool {
 }
 
 // Discover walks the roots looking for git repositories and returns the ones
-// that have linked worktrees. Worktrees living outside the roots are
-// included too, since they are listed by their repository.
+// that have linked worktrees, sorted by name. Worktrees living outside the
+// roots are included too, since they are listed by their repository.
 func Discover(ctx context.Context, roots []string, opts ScanOptions, p *ScanProgress) ([]Repo, error) {
-	seen := map[string]bool{}
-	var commonDirs []string
-	add := func(dir string) {
-		if resolved, err := filepath.EvalSymlinks(dir); err == nil {
-			dir = resolved
-		}
-		if !seen[dir] {
-			seen[dir] = true
-			commonDirs = append(commonDirs, dir)
-			p.Found.Add(1)
-		}
-	}
-
-	for _, root := range roots {
-		err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
-			if ctxErr := ctx.Err(); ctxErr != nil {
-				return ctxErr
-			}
-			if err != nil {
-				if path == root {
-					return err
-				}
-				return nil // unreadable entry: skip it
-			}
-			name := d.Name()
-			if d.IsDir() {
-				switch {
-				case name == ".git":
-					add(path)
-					return fs.SkipDir
-				case path != root && opts.skip(name):
-					return fs.SkipDir
-				case (strings.HasSuffix(name, ".git") || name == ".bare") && isBareRepo(path):
-					add(path)
-					return fs.SkipDir
-				}
-				p.Dirs.Add(1)
-				p.current.Store(&path)
-				if opts.MaxDepth > 0 && depth(root, path) >= opts.MaxDepth {
-					// Still look for a ".git" here, but go no deeper.
-					checkGitEntry(filepath.Join(path, ".git"), add)
-					return fs.SkipDir
-				}
-				return nil
-			}
-			// A ".git" file marks a linked worktree (or a submodule).
-			if name == ".git" && d.Type().IsRegular() {
-				if dir, ok := commonDirFromGitFile(path); ok {
-					add(dir)
-				}
-			}
-			return nil
-		})
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	// Load repositories in parallel; most have no linked worktrees.
-	loaded := make([]Repo, len(commonDirs))
-	jobs := make(chan int, len(commonDirs))
-	for i := range commonDirs {
-		jobs <- i
-	}
-	close(jobs)
-	var wg sync.WaitGroup
-	for range min(runtime.NumCPU(), len(commonDirs)) {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for i := range jobs {
-				if repo, err := loadRepo(ctx, commonDirs[i]); err == nil {
-					loaded[i] = repo
-				}
-			}
-		}()
-	}
-	wg.Wait()
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
 	var repos []Repo
-	for _, repo := range loaded {
-		if len(repo.Worktrees) > 0 {
-			repos = append(repos, repo)
-		}
+	err := DiscoverEach(ctx, roots, opts, p, func(r Repo, _ bool) { repos = append(repos, r) })
+	if err != nil {
+		return nil, err
 	}
 	sort.Slice(repos, func(i, j int) bool {
 		if repos[i].Name != repos[j].Name {
@@ -173,6 +90,75 @@ func Discover(ctx context.Context, roots []string, opts ScanOptions, p *ScanProg
 		return repos[i].Path < repos[j].Path
 	})
 	return repos, nil
+}
+
+// DiscoverEach is Discover reporting each repository through emit as soon
+// as it is loaded, instead of after the whole walk. Repositories that
+// contain a root (you ran woma inside them) are reported first, before the
+// walk starts, with current set. emit is never called concurrently.
+func DiscoverEach(ctx context.Context, roots []string, opts ScanOptions, p *ScanProgress, emit func(repo Repo, current bool)) error {
+	var mu sync.Mutex
+	seen := map[string]bool{}
+	claim := func(dir string) (string, bool) {
+		if resolved, err := filepath.EvalSymlinks(dir); err == nil {
+			dir = resolved
+		}
+		mu.Lock()
+		defer mu.Unlock()
+		if seen[dir] {
+			return "", false
+		}
+		seen[dir] = true
+		p.Found.Add(1)
+		return dir, true
+	}
+	var emitMu sync.Mutex
+	report := func(dir string, current bool) {
+		if repo, err := loadRepo(ctx, dir); err == nil && len(repo.Worktrees) > 0 {
+			emitMu.Lock()
+			defer emitMu.Unlock()
+			emit(repo, current)
+		}
+	}
+
+	// The repository you're in is one git call away; show it right away.
+	for _, root := range roots {
+		if out, err := output(ctx, root, "rev-parse", "--path-format=absolute", "--git-common-dir"); err == nil {
+			if dir, ok := claim(strings.TrimSpace(out)); ok {
+				report(dir, true)
+			}
+		}
+	}
+
+	// Load repositories in parallel while the walk continues; most have no
+	// linked worktrees.
+	jobs := make(chan string, 64)
+	var wg sync.WaitGroup
+	for range runtime.NumCPU() {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for dir := range jobs {
+				report(dir, false)
+			}
+		}()
+	}
+	add := func(dir string) {
+		if dir, ok := claim(dir); ok {
+			select {
+			case jobs <- dir:
+			case <-ctx.Done():
+			}
+		}
+	}
+
+	walkErr := walk(ctx, roots, opts, p, add)
+	close(jobs)
+	wg.Wait()
+	if walkErr != nil {
+		return walkErr
+	}
+	return ctx.Err()
 }
 
 // depth is how many directory levels path is below root.

@@ -13,61 +13,24 @@ import (
 
 	"woma/internal/config"
 	"woma/internal/core"
+	"woma/internal/fsutil"
 	"woma/internal/git"
 )
 
 const maxParallelDeletes = 3
 
-// startInspecting measures and inspects every worktree in the background,
-// reporting each through m.inspectCh.
-func (m *Model) startInspecting() tea.Cmd {
-	items := m.allItems()
-	m.inspectTotal, m.inspectDone = len(items), 0
-	if len(items) == 0 {
-		return nil
-	}
-
-	// Workers get copies of what they need: items are only touched by Update.
-	type job struct {
-		it   *item
-		repo *git.Repo
-		wt   git.Worktree
-	}
-	jobs := make(chan job, len(items))
-	for _, it := range items {
-		jobs <- job{it, it.e.Repo, it.e.WT}
-	}
-	close(jobs)
-	results := make(chan inspectMsg, len(items))
-	m.inspectCh = results
-
-	ctx := m.ctx
-	for range min(runtime.NumCPU(), len(items)) {
-		go func() {
-			for j := range jobs {
-				results <- inspectMsg{it: j.it, e: core.Inspect(ctx, j.repo, j.wt), initial: true}
-			}
-		}()
-	}
-	return tea.Batch(waitFor(results), m.startSpinner())
-}
-
+// reinspect refreshes an item after an action changed it.
 func (m *Model) reinspect(it *item) tea.Cmd {
 	ctx, repo, wt := m.ctx, it.e.Repo, it.e.WT
-	return func() tea.Msg {
-		return inspectMsg{it: it, e: core.Inspect(ctx, repo, wt)}
-	}
+	return tea.Batch(
+		func() tea.Msg { return statusMsg{it: it, status: git.Inspect(ctx, repo, wt)} },
+		func() tea.Msg { return sizeMsg{it: it, stats: fsutil.Measure(ctx, wt.Path)} },
+	)
 }
 
 func (m *Model) rescan() tea.Cmd {
-	if m.inspectDone < m.inspectTotal {
-		m.setFlash("still measuring; try again in a moment", true)
-		return nil
-	}
-	m.scan = &git.ScanProgress{}
-	m.state = stateScanning
-	m.groups, m.rows = nil, nil
-	return tea.Batch(m.startScan(), m.startSpinner())
+	m.cursorMoved = false
+	return m.startScan()
 }
 
 // runOp runs fn in the background with a spinner and status text. Only one
@@ -113,6 +76,7 @@ func (m *Model) startDelete() tea.Cmd {
 	close(jobs)
 	results := make(chan deleteMsg, len(sel))
 	m.deleteCh = results
+	waitFor := func() tea.Cmd { return func() tea.Msg { return <-results } }
 
 	deleteBranch := m.deleteBranch
 	for range min(maxParallelDeletes, len(sel)) {
@@ -123,7 +87,7 @@ func (m *Model) startDelete() tea.Cmd {
 			}
 		}()
 	}
-	return tea.Batch(waitFor(results), m.startSpinner())
+	return tea.Batch(waitFor(), m.startSpinner())
 }
 
 func (m *Model) finishDelete(msg deleteMsg) tea.Cmd {
@@ -139,7 +103,8 @@ func (m *Model) finishDelete(msg deleteMsg) tea.Cmd {
 		m.freedSize += max(it.e.Size, it.freed.Load())
 	}
 	if m.deleted < len(m.deleting) {
-		return waitFor(m.deleteCh)
+		ch := m.deleteCh
+		return func() tea.Msg { return <-ch }
 	}
 
 	m.finished = true

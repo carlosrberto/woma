@@ -11,6 +11,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"woma/internal/config"
+	"woma/internal/fsutil"
 	"woma/internal/git"
 	"woma/internal/testutil"
 )
@@ -36,7 +37,7 @@ func drive(t *testing.T, m *Model, cmd tea.Cmd) {
 		case tea.BatchMsg:
 			queue = append(queue, msg...)
 		case spinner.TickMsg, tea.QuitMsg, nil:
-		case scanDoneMsg, inspectMsg, deleteMsg, cleanPreviewMsg, opMsg:
+		case envelope, statusMsg, sizeMsg, deleteMsg, cleanPreviewMsg, opMsg:
 			_, next := m.Update(msg)
 			queue = append(queue, next)
 		}
@@ -122,8 +123,8 @@ func TestScanAndInspect(t *testing.T) {
 	if len(m.groups) != 2 || m.groups[0].repo.Name != "api" || len(m.groups[0].items) != 2 {
 		t.Fatalf("groups: %+v", m.groups)
 	}
-	if m.inspectDone != m.inspectTotal || m.inspectTotal != 3 {
-		t.Fatalf("inspected %d/%d", m.inspectDone, m.inspectTotal)
+	if m.checkDone != 3 || m.checkTotal != 3 || m.sizeDone != 3 || m.sizeTotal != 3 || m.scanning {
+		t.Fatalf("checked %d/%d measured %d/%d scanning=%v", m.checkDone, m.checkTotal, m.sizeDone, m.sizeTotal, m.scanning)
 	}
 	a, b := find(m, ".worktrees/feature-a"), find(m, ".worktrees/feature-b")
 	if !a.e.Status.Merged || !a.e.Safe() {
@@ -450,18 +451,77 @@ func TestFormatting(t *testing.T) {
 	}
 }
 
-func TestDeleteWaitsForInspection(t *testing.T) {
-	m := newModel(fixture(t), false)
-	cmds := m.Init()
-	// Scan only; leave inspection pending.
-	for _, c := range cmds().(tea.BatchMsg) {
-		if msg, ok := c().(scanDoneMsg); ok {
-			m.Update(msg)
+// firstRepo starts a scan and handles events only until the first
+// repository is listed, leaving its inspection pending.
+func firstRepo(t *testing.T, m *Model) {
+	t.Helper()
+	m.Init()
+	for {
+		ev := <-m.events
+		m.Update(envelope{m.gen, ev})
+		if _, ok := ev.(repoMsg); ok {
+			return
+		}
+		if _, ok := ev.(scanDoneMsg); ok {
+			t.Fatal("scan finished without repositories")
 		}
 	}
-	if m.state != stateList || m.inspectDone == m.inspectTotal {
-		t.Fatalf("setup: state=%v inspected %d/%d", m.state, m.inspectDone, m.inspectTotal)
+}
+
+func TestListShowsBeforeInspection(t *testing.T) {
+	m := newModel(fixture(t), false)
+	firstRepo(t, m)
+	if m.state != stateList || len(m.visible()) == 0 || m.checkDone != 0 || m.sizeDone != 0 {
+		t.Fatalf("state=%v rows=%d checked=%d measured=%d", m.state, len(m.visible()), m.checkDone, m.sizeDone)
 	}
+	view := m.View()
+	if !strings.Contains(view, "…") {
+		t.Errorf("pending sizes should show …:\n%s", view)
+	}
+	m.cancel()
+}
+
+func TestCurrentRepoFirst(t *testing.T) {
+	root := fixture(t)
+	// Start inside web (alphabetically after api), from a subfolder.
+	sub := filepath.Join(root, "web", "docs")
+	os.MkdirAll(sub, 0o755)
+	m := New(Options{Roots: []string{sub}, Config: config.Default()})
+	m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	firstRepo(t, m)
+	if m.groups[0].repo.Name != "web" || !m.groups[0].current {
+		t.Fatalf("first group = %s", m.groups[0].repo.Name)
+	}
+	m.cancel()
+
+	// Scanning the parent folder from inside api: api is pinned first even
+	// when sorting by size puts web's bigger worktrees ahead.
+	m = New(Options{Roots: []string{filepath.Join(root, "api")}, Config: config.Default()})
+	drive(t, m, m.Init())
+	if len(m.groups) != 1 || !m.groups[0].current {
+		t.Fatalf("groups = %d", len(m.groups))
+	}
+}
+
+func TestRescanDropsStaleEvents(t *testing.T) {
+	m := newModel(fixture(t), false)
+	firstRepo(t, m)
+	oldGen := m.gen
+	drive(t, m, key(m, "r"))
+	if m.gen == oldGen || len(m.allItems()) != 3 || m.streaming() {
+		t.Fatalf("gen=%d items=%d streaming=%v", m.gen, len(m.allItems()), m.streaming())
+	}
+	before := len(m.allItems())
+	m.Update(envelope{oldGen, repoMsg{repo: git.Repo{Name: "stale", Worktrees: []git.Worktree{{Path: "/x"}}}}})
+	if len(m.allItems()) != before {
+		t.Fatal("event from the old scan was applied")
+	}
+}
+
+func TestDeleteWaitsForInspection(t *testing.T) {
+	m := newModel(fixture(t), false)
+	firstRepo(t, m)
+	defer m.cancel()
 	key(m, "d")
 	if m.state != stateList || !strings.Contains(m.flash, "still inspecting") {
 		t.Fatalf("delete allowed before inspection: state=%v flash=%q", m.state, m.flash)
@@ -513,8 +573,8 @@ func TestLateInspectionKeepsActionChanges(t *testing.T) {
 	if !it.wt().Locked {
 		t.Fatal("lock failed")
 	}
-	stale.Size = 12345
-	m.Update(inspectMsg{it: it, e: stale})
+	m.Update(statusMsg{it: it, status: stale.Status})
+	m.Update(sizeMsg{it: it, stats: fsutil.Stats{Size: 12345}})
 	if !it.wt().Locked || it.e.Size != 12345 {
 		t.Errorf("inspection result reverted the lock (locked=%v size=%d)", it.wt().Locked, it.e.Size)
 	}

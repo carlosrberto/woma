@@ -23,17 +23,17 @@ func (m *Model) listKey(msg tea.KeyMsg) tea.Cmd {
 	case "esc":
 		m.setFilter("")
 	case "up", "k":
-		m.move(-1)
+		m.userMove(-1)
 	case "down", "j":
-		m.move(1)
+		m.userMove(1)
 	case "pgup", "ctrl+u":
-		m.move(-max(1, m.listHeight()/2))
+		m.userMove(-max(1, m.listHeight()/2))
 	case "pgdown", "ctrl+d":
-		m.move(max(1, m.listHeight()/2))
+		m.userMove(max(1, m.listHeight()/2))
 	case "home", "g":
-		m.move(-len(m.rows))
+		m.userMove(-len(m.rows))
 	case "end", "G":
-		m.move(len(m.rows))
+		m.userMove(len(m.rows))
 	case " ", "space", "x":
 		if it := m.current(); it != nil {
 			it.selected = !it.selected
@@ -176,18 +176,17 @@ func toggleAll(items []*item) {
 	}
 }
 
-func (m *Model) buildGroups(repos []git.Repo) {
-	m.groups = nil
-	for i := range repos {
-		r := &repos[i]
-		g := &group{repo: r}
-		for _, wt := range r.Worktrees {
-			it := &item{name: m.displayPath(r, wt.Path)}
-			it.e.Repo, it.e.WT = r, wt
-			g.items = append(g.items, it)
-		}
-		m.groups = append(m.groups, g)
+// addRepo adds a newly found repository and starts inspecting its worktrees.
+func (m *Model) addRepo(repo git.Repo, current bool) {
+	r := &repo
+	g := &group{repo: r, current: current}
+	for _, wt := range r.Worktrees {
+		it := &item{name: m.displayPath(r, wt.Path)}
+		it.e.Repo, it.e.WT = r, wt
+		g.items = append(g.items, it)
+		m.inspect(it)
 	}
+	m.groups = append(m.groups, g)
 	m.sortItems()
 	m.rebuildRows()
 }
@@ -267,6 +266,9 @@ func (m *Model) sortItems() {
 	}
 	sort.SliceStable(m.groups, func(i, j int) bool {
 		a, b := m.groups[i], m.groups[j]
+		if a.current != b.current {
+			return a.current
+		}
 		if m.sort == sortSize {
 			if sa, sb := groupSize(a), groupSize(b); sa != sb {
 				return sa > sb
@@ -280,6 +282,9 @@ func (m *Model) sortItems() {
 // same item when it is still visible.
 func (m *Model) rebuildRows() {
 	cur := m.current()
+	if !m.cursorMoved {
+		cur, m.cursor = nil, 0
+	}
 	oldCursor := m.cursor
 
 	m.rows = m.rows[:0]
@@ -307,6 +312,11 @@ func (m *Model) rebuildRows() {
 		}
 	}
 	m.scrollToCursor()
+}
+
+func (m *Model) userMove(n int) {
+	m.cursorMoved = true
+	m.move(n)
 }
 
 // move moves the cursor n items up (negative) or down, skipping headers.

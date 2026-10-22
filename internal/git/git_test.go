@@ -139,3 +139,31 @@ func TestParsePorcelain(t *testing.T) {
 		t.Errorf("repoName = %q", got)
 	}
 }
+
+func TestDiscoverEachReportsCurrentRepoFirst(t *testing.T) {
+	root := testutil.TempDir(t)
+	app := filepath.Join(root, "app")
+	testutil.NewRepo(t, app)
+	testutil.Git(t, app, "worktree", "add", "-q", ".worktrees/feature-x", "-b", "feature-x")
+	// Repositories nested below, found by walking.
+	for _, name := range []string{"aaa-lib", "zzz-tool"} {
+		dir := filepath.Join(app, "packages", name)
+		testutil.NewRepo(t, dir)
+		testutil.Git(t, dir, "worktree", "add", "-q", dir+"-wt", "-b", "x")
+	}
+
+	// Started from a subfolder of the repository.
+	start := filepath.Join(app, "packages")
+	var order []string
+	var current []bool
+	err := DiscoverEach(context.Background(), []string{start}, ScanOptions{}, &ScanProgress{}, func(r Repo, cur bool) {
+		order = append(order, r.Name)
+		current = append(current, cur)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(order) != 3 || order[0] != "app" || !current[0] || current[1] || current[2] {
+		t.Fatalf("order = %v current = %v", order, current)
+	}
+}
