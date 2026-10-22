@@ -185,12 +185,28 @@ Opens the browser described above.
 
 ### `woma pick [path...]`
 
-Opens the browser in pick mode: `enter` prints the chosen worktree's path and
-exits; nothing else goes to stdout, so it works in `$(...)`. Exits with an
-error if you quit without picking. Deleting with `d` still works.
+A focused picker for jumping to a worktree. It shows the same list as the
+browser, but only to choose from: move, search (`/`), sort (`s`) and toggle
+details (`i`), then press `enter`. woma prints the path of the worktree under
+the cursor and exits. Nothing else goes to stdout, so it works in `$(...)`.
 
 ```sh
 cd "$(woma pick ~/code)"
+```
+
+There are no checkboxes, and everything that changes worktrees (delete,
+clean, lock, move, repair, open) is disabled, so a stray key can't do
+damage. Quitting with `q` prints nothing and exits with an error, so
+`cd "$(woma pick)"` leaves you where you were. Worktrees whose folder is
+missing can't be picked.
+
+`--multi` lets you select several worktrees with `space` (plus `a`, `A` and
+`m`). `enter` then prints each selected path on its own line, or the one
+under the cursor if none are selected. It's for scripts:
+
+```sh
+woma pick --multi | xargs -I{} git -C {} pull   # update several worktrees
+code $(woma pick --multi)                       # open a few in your editor
 ```
 
 ### `woma new <branch>`
@@ -295,7 +311,7 @@ woma shell-init fish | source
 Then:
 
 ```sh
-wcd                 # pick a worktree and cd into it
+wcd                 # pick a worktree and cd into it (single choice)
 wcd ~/code          # pick among worktrees under ~/code
 wnew feat/search    # create a worktree and cd into it
 ```

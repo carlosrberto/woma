@@ -21,6 +21,7 @@ const usage = `woma: git worktree manager
 Usage:
   woma [path...]              browse worktrees in a TUI (default command)
   woma pick [path...]         choose a worktree and print its path
+                              (--multi: choose several, one path per line)
   woma new <branch> [flags]   create a worktree for a branch
   woma list [path...] [flags] print worktrees
   woma clean [path...] [flags] delete worktrees matching filters

@@ -277,20 +277,89 @@ func TestDeleteWithBranches(t *testing.T) {
 	}
 }
 
-func TestPickMode(t *testing.T) {
-	root := fixture(t)
-	m := newModel(root, true)
+func pickModel(t *testing.T, root string, multi bool) *Model {
+	t.Helper()
+	m := New(Options{Roots: []string{root}, Config: config.Default(), Pick: true, Multi: multi})
+	m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	drive(t, m, m.Init())
+	return m
+}
+
+func TestPickSingle(t *testing.T) {
+	root := fixture(t)
+	m := pickModel(t, root, false)
+	view := m.View()
+	if strings.Contains(view, "[ ]") || !strings.Contains(view, "enter pick ·") || strings.Contains(view, "delete") {
+		t.Errorf("single pick view should have no checkboxes or delete hints:\n%s", view)
+	}
+
+	// Selection and every action that changes worktrees are disabled.
+	for _, k := range []string{"space", "x", "a", "A", "m", "d", "backspace", "c", "L", "M", "R", "o", "t"} {
+		if cmd := key(m, k); cmd != nil || m.state != stateList || len(m.selected()) != 0 {
+			t.Fatalf("key %q did something in pick mode (state=%v)", k, m.state)
+		}
+	}
+	if !exists(filepath.Join(root, "api/.worktrees/feature-a")) {
+		t.Fatal("pick mode changed a worktree")
+	}
+
 	key(m, "j")
 	cmd := key(m, "enter")
-	if m.Picked() != filepath.Join(root, "api/.worktrees/feature-b") {
-		t.Fatalf("picked %q", m.Picked())
+	if got := m.Picked(); len(got) != 1 || got[0] != filepath.Join(root, "api/.worktrees/feature-b") {
+		t.Fatalf("picked %v", got)
 	}
 	if _, ok := cmd().(tea.QuitMsg); !ok {
 		t.Error("pick should quit")
 	}
-	if !exists(m.Picked()) {
-		t.Error("pick must not delete anything")
+}
+
+func TestPickSingleHelp(t *testing.T) {
+	m := pickModel(t, fixture(t), false)
+	key(m, "?")
+	help := m.View()
+	if !strings.Contains(help, "print the path of the worktree under the cursor") || strings.Contains(help, "lock") ||
+		strings.Contains(help, "select") || !strings.Contains(help, "quit without picking") {
+		t.Errorf("pick help:\n%s", help)
+	}
+}
+
+func TestPickMulti(t *testing.T) {
+	root := fixture(t)
+	m := pickModel(t, root, true)
+	if view := m.View(); !strings.Contains(view, "[ ]") || !strings.Contains(view, "pick (multiple)") {
+		t.Errorf("multi pick view:\n%s", view)
+	}
+	if cmd := key(m, "d"); cmd != nil || m.state != stateList {
+		t.Fatal("delete must stay disabled with --multi")
+	}
+	key(m, "space", "G", "space") // feature-a and web-hotfix
+	key(m, "enter")
+	want := []string{filepath.Join(root, "api/.worktrees/feature-a"), filepath.Join(root, "web-hotfix")}
+	if got := m.Picked(); strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Fatalf("picked %v, want %v", got, want)
+	}
+
+	// With nothing selected, enter picks the worktree under the cursor.
+	m = pickModel(t, root, true)
+	key(m, "j", "enter")
+	if got := m.Picked(); len(got) != 1 || got[0] != filepath.Join(root, "api/.worktrees/feature-b") {
+		t.Fatalf("picked %v", got)
+	}
+}
+
+func TestPickSkipsMissingWorktrees(t *testing.T) {
+	root := fixture(t)
+	os.RemoveAll(filepath.Join(root, "api/.worktrees/feature-a"))
+	m := pickModel(t, root, true)
+	if !m.current().wt().Prunable {
+		t.Fatal("setup: expected the missing worktree under the cursor")
+	}
+	if cmd := key(m, "enter"); cmd != nil || m.Picked() != nil {
+		t.Fatalf("picked a missing worktree: %v", m.Picked())
+	}
+	key(m, "space", "j", "space", "enter") // missing + feature-b
+	if got := m.Picked(); len(got) != 1 || got[0] != filepath.Join(root, "api/.worktrees/feature-b") {
+		t.Fatalf("picked %v", got)
 	}
 }
 

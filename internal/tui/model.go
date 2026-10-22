@@ -126,8 +126,11 @@ type Options struct {
 	Roots  []string
 	Config config.Config
 	// Pick makes enter choose the worktree under the cursor and quit;
-	// Picked then returns its path.
+	// Picked then returns its path. Actions that change worktrees are
+	// disabled.
 	Pick bool
+	// Multi (with Pick) allows selecting several worktrees to pick.
+	Multi bool
 	// Now overrides the clock, for tests.
 	Now func() time.Time
 }
@@ -195,7 +198,7 @@ type Model struct {
 	opRunning string // description of the running action, if any
 	flash     string
 	flashErr  bool
-	picked    string
+	picked    []string
 }
 
 // New returns a model that scans opts.Roots for worktrees.
@@ -233,8 +236,8 @@ func (m *Model) Err() error { return m.err }
 // Summary returns how many worktrees were removed and the space freed.
 func (m *Model) Summary() (int, int64) { return m.removed, m.freedSize }
 
-// Picked returns the path chosen in pick mode, or "".
-func (m *Model) Picked() string { return m.picked }
+// Picked returns the paths chosen in pick mode, if any.
+func (m *Model) Picked() []string { return m.picked }
 
 func (m *Model) Init() tea.Cmd {
 	return tea.Batch(m.spinner.Tick, m.startScan())

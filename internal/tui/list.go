@@ -15,8 +15,12 @@ func (m *Model) listKey(msg tea.KeyMsg) tea.Cmd {
 		return m.searchKey(msg)
 	}
 	m.flash = ""
+	key := msg.String()
+	if m.opts.Pick && !m.pickAllows(key) {
+		return nil
+	}
 	var cmd tea.Cmd
-	switch msg.String() {
+	switch key {
 	case "q":
 		m.cancel()
 		return tea.Quit
@@ -61,12 +65,7 @@ func (m *Model) listKey(msg tea.KeyMsg) tea.Cmd {
 		m.state = stateHelp
 	case "enter":
 		if m.opts.Pick {
-			if it := m.current(); it != nil && !it.wt().Prunable {
-				m.picked = it.wt().Path
-				m.cancel()
-				return tea.Quit
-			}
-			break
+			return m.pick()
 		}
 		m.confirmDelete()
 	case "d", "delete", "backspace":
@@ -88,6 +87,44 @@ func (m *Model) listKey(msg tea.KeyMsg) tea.Cmd {
 	}
 	m.scrollToCursor()
 	return cmd
+}
+
+// pickAllows reports whether key works in pick mode, which only chooses
+// worktrees: nothing that changes them, and selection only with Multi.
+func (m *Model) pickAllows(key string) bool {
+	switch key {
+	case "q", "esc", "enter", "up", "k", "down", "j", "pgup", "ctrl+u", "pgdown", "ctrl+d",
+		"home", "g", "end", "G", "/", "s", "i", "?", "r":
+		return true
+	case " ", "space", "x", "a", "A", "m":
+		return m.opts.Multi
+	}
+	return false
+}
+
+// pick ends pick mode with the chosen paths: the selected worktrees with
+// Multi, otherwise (or when none are selected) the one under the cursor.
+// Worktrees whose folder is missing can't be picked.
+func (m *Model) pick() tea.Cmd {
+	var paths []string
+	if m.opts.Multi {
+		for _, it := range m.selected() {
+			if !it.wt().Prunable {
+				paths = append(paths, it.wt().Path)
+			}
+		}
+	}
+	if len(paths) == 0 {
+		if it := m.current(); it != nil && !it.wt().Prunable {
+			paths = []string{it.wt().Path}
+		}
+	}
+	if len(paths) == 0 {
+		return nil
+	}
+	m.picked = paths
+	m.cancel()
+	return tea.Quit
 }
 
 func (m *Model) searchKey(msg tea.KeyMsg) tea.Cmd {

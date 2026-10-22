@@ -18,7 +18,7 @@ func runBrowse(args []string, cfg config.Config, stdout, stderr io.Writer) error
 	if err != nil {
 		return err
 	}
-	m, err := runTUI(paths, cfg, false, os.Stdout)
+	m, err := runTUI(paths, cfg, tui.Options{}, os.Stdout)
 	if err != nil {
 		return err
 	}
@@ -31,24 +31,28 @@ func runBrowse(args []string, cfg config.Config, stdout, stderr io.Writer) error
 // runPick shows the TUI on stderr and prints the chosen path on stdout, so
 // it works inside $(...).
 func runPick(args []string, cfg config.Config, stdout, stderr io.Writer) error {
-	fs := newFlagSet("pick", "woma pick [path...]", stderr)
+	fs := newFlagSet("pick", "woma pick [path...] [--multi]", stderr)
+	multi := fs.Bool("multi", false, "select several worktrees with space; prints one path per line")
 	paths, err := parseArgs(fs, args)
 	if err != nil {
 		return err
 	}
 	tui.UseOutput(os.Stderr)
-	m, err := runTUI(paths, cfg, true, os.Stderr)
+	m, err := runTUI(paths, cfg, tui.Options{Pick: true, Multi: *multi}, os.Stderr)
 	if err != nil {
 		return err
 	}
-	if m.Picked() == "" {
+	if len(m.Picked()) == 0 {
 		return errSilent
 	}
-	fmt.Fprintln(stdout, m.Picked())
+	for _, p := range m.Picked() {
+		fmt.Fprintln(stdout, p)
+	}
 	return nil
 }
 
-func runTUI(paths []string, cfg config.Config, pick bool, out io.Writer) (*tui.Model, error) {
+// runTUI runs the browser; opts gets the roots and config filled in.
+func runTUI(paths []string, cfg config.Config, opts tui.Options, out io.Writer) (*tui.Model, error) {
 	if _, err := exec.LookPath("git"); err != nil {
 		return nil, fmt.Errorf("git not found in PATH")
 	}
@@ -56,7 +60,8 @@ func runTUI(paths []string, cfg config.Config, pick bool, out io.Writer) (*tui.M
 	if err != nil {
 		return nil, err
 	}
-	m := tui.New(tui.Options{Roots: roots, Config: cfg, Pick: pick})
+	opts.Roots, opts.Config = roots, cfg
+	m := tui.New(opts)
 	if _, err := tea.NewProgram(m, tea.WithAltScreen(), tea.WithOutput(out)).Run(); err != nil {
 		return nil, err
 	}

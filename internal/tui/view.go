@@ -36,7 +36,10 @@ func (m *Model) title() string {
 		roots[i] = Tildify(r)
 	}
 	t := styles.title.Render("woma")
-	if m.opts.Pick {
+	switch {
+	case m.opts.Pick && m.opts.Multi:
+		t += styles.dim.Render(" pick (multiple)")
+	case m.opts.Pick:
 		t += styles.dim.Render(" pick")
 	}
 	return t + "  " + styles.dim.Render(truncRight(strings.Join(roots, ", "), max(10, m.width-12)))
@@ -115,11 +118,15 @@ func (m *Model) viewList() string {
 	}
 
 	b.WriteString("\n" + m.statusLine() + "\n")
-	enter := "enter delete"
-	if m.opts.Pick {
-		enter = "enter pick · d delete"
+	sorting := "s sort (" + m.sort.String() + ")"
+	help := "↑/↓ move · space select · m select safe · / search · " + sorting + " · enter delete · ? help · q quit"
+	switch {
+	case m.opts.Pick && m.opts.Multi:
+		help = "↑/↓ move · space select · / search · " + sorting + " · enter pick selected · ? help · q cancel"
+	case m.opts.Pick:
+		help = "↑/↓ move · / search · " + sorting + " · enter pick · ? help · q cancel"
 	}
-	b.WriteString(styles.dim.Render(truncRight("↑/↓ move · space select · m select safe · / search · s sort ("+m.sort.String()+") · "+enter+" · ? help · q quit", m.width)))
+	b.WriteString(styles.dim.Render(truncRight(help, m.width)))
 	return b.String()
 }
 
@@ -179,12 +186,15 @@ func (m *Model) renderRow(r row, isCursor bool, nameW, branchW int) string {
 		pointer = styles.pointer.Render("▸ ")
 		name = styles.bold.Render(name)
 	}
-	box := "[ ]"
-	if it.selected {
-		box = styles.check.Render("[x]")
+	box := "[ ] "
+	switch {
+	case m.opts.Pick && !m.opts.Multi:
+		box = "" // nothing to select: enter picks the cursor
+	case it.selected:
+		box = styles.check.Render("[x]") + " "
 	}
 	branch := styles.dim.Render(pad(truncRight(BranchLabel(it.wt()), branchW), branchW))
-	return "  " + pointer + box + " " + name + "  " + branch + "  " + m.ageCell(it) + "  " + sizeCell(it) + "  " + m.labels(it)
+	return "  " + pointer + box + name + "  " + branch + "  " + m.ageCell(it) + "  " + sizeCell(it) + "  " + m.labels(it)
 }
 
 func (m *Model) ageCell(it *item) string {
@@ -487,37 +497,50 @@ func (m *Model) viewMove() string {
 	return b.String()
 }
 
-var helpKeys = [][2]string{
-	{"↑ ↓ / k j", "move"},
-	{"pgup pgdown", "move half a page"},
-	{"g / G", "first / last worktree"},
-	{"space / x", "select or unselect"},
-	{"a", "select all in this repository"},
-	{"A", "select all shown"},
-	{"m", "select safe ones: merged or gone, nothing to lose, not locked"},
-	{"/", "search by path, branch or repository (esc clears)"},
-	{"s", "sort by name, size or activity (oldest first)"},
-	{"i", "show or hide the detail pane"},
-	{"enter / d", "delete selected (or the one under the cursor)"},
-	{"o", "open in editor"},
-	{"t", "open in a new tmux window"},
-	{"c", "clean build artifacts (git-ignored files)"},
-	{"L", "lock or unlock"},
-	{"M", "move to another folder"},
-	{"R", "repair the repository's worktree links"},
-	{"r", "rescan"},
-	{"esc", "clear the search"},
-	{"q", "quit"},
+// helpKeys lists the keys; key is the one checked against pickAllows, and
+// entries with key "enter" are replaced in pick mode.
+var helpKeys = []struct{ label, desc, key string }{
+	{"↑ ↓ / k j", "move", "up"},
+	{"pgup pgdown", "move half a page", "pgup"},
+	{"g / G", "first / last worktree", "g"},
+	{"space / x", "select or unselect", "x"},
+	{"a", "select all in this repository", "a"},
+	{"A", "select all shown", "A"},
+	{"m", "select safe ones: merged or gone, nothing to lose, not locked", "m"},
+	{"/", "search by path, branch or repository (esc clears)", "/"},
+	{"s", "sort by name, size or activity (oldest first)", "s"},
+	{"i", "show or hide the detail pane", "i"},
+	{"enter / d", "delete selected (or the one under the cursor)", "enter"},
+	{"o", "open in editor", "o"},
+	{"t", "open in a new tmux window", "t"},
+	{"c", "clean build artifacts (git-ignored files)", "c"},
+	{"L", "lock or unlock", "L"},
+	{"M", "move to another folder", "M"},
+	{"R", "repair the repository's worktree links", "R"},
+	{"r", "rescan", "r"},
+	{"esc", "clear the search", "esc"},
+	{"q", "quit", "q"},
 }
 
 func (m *Model) viewHelp() string {
 	var b strings.Builder
 	b.WriteString(m.title() + "\n\n")
 	for _, k := range helpKeys {
-		b.WriteString("  " + styles.key.Render(pad(k[0], 13)) + " " + k[1] + "\n")
-	}
-	if m.opts.Pick {
-		b.WriteString("\n  " + styles.dim.Render("pick mode: enter prints the worktree path and quits") + "\n")
+		label, desc := k.label, k.desc
+		if m.opts.Pick {
+			if !m.pickAllows(k.key) {
+				continue
+			}
+			switch {
+			case k.key == "enter" && m.opts.Multi:
+				label, desc = "enter", "print the selected paths (or the one under the cursor) and quit"
+			case k.key == "enter":
+				label, desc = "enter", "print the path of the worktree under the cursor and quit"
+			case k.key == "q":
+				desc = "quit without picking"
+			}
+		}
+		b.WriteString("  " + styles.key.Render(pad(label, 13)) + " " + desc + "\n")
 	}
 	b.WriteString("\n" + styles.dim.Render(" press any key to go back"))
 	return b.String()
