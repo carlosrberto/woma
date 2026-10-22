@@ -52,6 +52,8 @@ func runClean(args []string, cfg config.Config, stdin io.Reader, stdout, stderr 
 		var reason string
 		switch {
 		case *force:
+		case !e.Status.Complete:
+			reason = "could not be fully inspected"
 		case e.WT.Locked:
 			reason = "locked"
 		case e.Status.Dirty:
@@ -60,7 +62,7 @@ func runClean(args []string, cfg config.Config, stdin io.Reader, stdout, stderr 
 			reason = "has commits on no branch"
 		}
 		if reason != "" {
-			fmt.Fprintf(stdout, "skip    %s (%s; use --force)\n", displayPath(e.WT.Path), reason)
+			fmt.Fprintf(stdout, "skip    %s (%s; use --force)\n", tui.Tildify(e.WT.Path), reason)
 			continue
 		}
 		targets = append(targets, e)
@@ -80,7 +82,7 @@ func runClean(args []string, cfg config.Config, stdin io.Reader, stdout, stderr 
 				branch = "  (branch " + e.WT.Branch + " kept: unpushed commits)"
 			}
 		}
-		fmt.Fprintf(stdout, "delete  %s  %s  %s  [%s]%s\n", e.Repo.Name, displayPath(e.WT.Path),
+		fmt.Fprintf(stdout, "delete  %s  %s  %s  [%s]%s\n", e.Repo.Name, tui.Tildify(e.WT.Path),
 			tui.HumanBytes(e.Size), labelText(e, stale, now), branch)
 	}
 	summary := fmt.Sprintf("%d worktree(s), %s", len(targets), tui.HumanBytes(total))
@@ -109,12 +111,12 @@ func runClean(args []string, cfg config.Config, stdin io.Reader, stdout, stderr 
 		r := core.Remove(e, *deleteBranch, &counter)
 		if r.Err != nil {
 			failed = true
-			fmt.Fprintf(stdout, "failed  %s: %v\n", displayPath(e.WT.Path), r.Err)
+			fmt.Fprintf(stdout, "failed  %s: %v\n", tui.Tildify(e.WT.Path), r.Err)
 			continue
 		}
 		removed++
 		freed += max(e.Size, counter.Load())
-		line := "removed " + displayPath(e.WT.Path)
+		line := "removed " + tui.Tildify(e.WT.Path)
 		if r.BranchDeleted {
 			line += " and branch " + e.WT.Branch
 		} else if r.BranchNote != "" {

@@ -449,3 +449,87 @@ func TestFormatting(t *testing.T) {
 		t.Error("zero time should render as —")
 	}
 }
+
+func TestDeleteWaitsForInspection(t *testing.T) {
+	m := newModel(fixture(t), false)
+	cmds := m.Init()
+	// Scan only; leave inspection pending.
+	for _, c := range cmds().(tea.BatchMsg) {
+		if msg, ok := c().(scanDoneMsg); ok {
+			m.Update(msg)
+		}
+	}
+	if m.state != stateList || m.inspectDone == m.inspectTotal {
+		t.Fatalf("setup: state=%v inspected %d/%d", m.state, m.inspectDone, m.inspectTotal)
+	}
+	key(m, "d")
+	if m.state != stateList || !strings.Contains(m.flash, "still inspecting") {
+		t.Fatalf("delete allowed before inspection: state=%v flash=%q", m.state, m.flash)
+	}
+	if len(m.selected()) != 0 {
+		t.Error("refused delete must not leave the item selected")
+	}
+	if labels := m.labels(m.current()); labels != "" {
+		t.Errorf("uninspected item shows labels %q", labels)
+	}
+}
+
+func TestCancelUndoesAutoSelection(t *testing.T) {
+	m := scanned(t, fixture(t))
+	key(m, "d", "n") // auto-selects feature-a, then cancels
+	if len(m.selected()) != 0 {
+		t.Fatal("cancel should unselect the auto-selected worktree")
+	}
+	key(m, "j", "d")
+	if sel := m.selected(); len(sel) != 1 || sel[0].name != ".worktrees/feature-b" {
+		t.Fatalf("second delete targets %v", sel)
+	}
+	key(m, "esc")
+	key(m, "space", "d", "n") // explicit selection survives cancel
+	if len(m.selected()) != 1 {
+		t.Fatal("explicit selection should survive cancel")
+	}
+}
+
+func TestMoveRefusesExistingDestination(t *testing.T) {
+	root := fixture(t)
+	m := scanned(t, root)
+	key(m, "M")
+	other := filepath.Join(root, "api/.worktrees/feature-b")
+	m.moveInput.SetValue(other)
+	if cmd := key(m, "enter"); cmd != nil || !strings.Contains(m.flash, "already exists") {
+		t.Fatalf("flash = %q", m.flash)
+	}
+	if !exists(filepath.Join(root, "api/.worktrees/feature-a")) || exists(filepath.Join(other, "feature-a")) {
+		t.Fatal("worktree was moved into the existing folder")
+	}
+}
+
+func TestLateInspectionKeepsActionChanges(t *testing.T) {
+	m := scanned(t, fixture(t))
+	it := m.current()
+	stale := it.e // snapshot as an in-flight inspection would carry
+	drive(t, m, key(m, "L"))
+	if !it.wt().Locked {
+		t.Fatal("lock failed")
+	}
+	stale.Size = 12345
+	m.Update(inspectMsg{it: it, e: stale})
+	if !it.wt().Locked || it.e.Size != 12345 {
+		t.Errorf("inspection result reverted the lock (locked=%v size=%d)", it.wt().Locked, it.e.Size)
+	}
+}
+
+func TestCtrlCWaitsForDeletion(t *testing.T) {
+	m := scanned(t, fixture(t))
+	key(m, "space", "enter")
+	cmd := key(m, "y")
+	_, quit := m.Update(tea.KeyMsg{Type: tea.KeyCtrlC})
+	if quit != nil || !strings.Contains(m.flash, "ctrl+c is disabled") {
+		t.Fatalf("ctrl+c during deletion: cmd=%v flash=%q", quit, m.flash)
+	}
+	drive(t, m, cmd)
+	if _, quit = m.Update(tea.KeyMsg{Type: tea.KeyCtrlC}); quit == nil {
+		t.Fatal("ctrl+c should quit once deletion finished")
+	}
+}

@@ -101,7 +101,7 @@ the changed files of the worktree under the cursor.
 | `t`               | Open in a new tmux window (when running inside tmux)                    |
 | `c`               | Clean build artifacts (see below)                                       |
 | `L`               | Lock or unlock (`git worktree lock`)                                    |
-| `M`               | Move to another folder (`git worktree move`)                            |
+| `M`               | Move to a new folder (`git worktree move`; the path must not exist yet) |
 | `R`               | Repair the repository's worktree links (`git worktree repair`)          |
 | `r`               | Rescan                                                                  |
 | `?`               | Help                                                                    |
@@ -109,18 +109,21 @@ the changed files of the worktree under the cursor.
 
 ### Deleting
 
-Select worktrees and press `enter`. The confirmation screen lists what will
-be removed and warns about anything that would be lost: uncommitted changes,
-or commits on a detached HEAD that no branch contains. It also flags locked
-worktrees.
+Select worktrees and press `enter`. Deleting waits until the selected
+worktrees have been inspected, so woma knows what you'd lose. The
+confirmation screen lists what will be removed and warns about anything that
+would be lost: uncommitted changes, or commits on a detached HEAD that no
+branch contains. It also flags locked worktrees.
 
 Press `b` on that screen to **also delete the branches**. Only branches that
 are merged into the default branch or fully pushed are deleted; branches with
 unpushed commits are kept and marked as such. Press `y` to go ahead.
 
 While deleting, woma shows an overall progress bar (space freed so far) and a
-bar per worktree; up to three are removed in parallel. When you quit, it
-prints how many worktrees it removed and how much space it freed.
+bar per worktree; up to three are removed in parallel. `ctrl+c` is disabled
+until it finishes. When you quit, it prints how many worktrees it removed and
+how much space it freed. Freed space counts only files whose last link is
+removed: files hard-linked from a package manager's store (pnpm) don't count.
 
 ### Cleaning build artifacts
 
@@ -150,9 +153,12 @@ editors take over the screen and return to woma when you exit them.
 | `N unpushed` | Commits that exist only locally. On a branch they survive worktree deletion (branches are kept); on a detached HEAD they would be lost. |
 | `locked`     | Locked with `git worktree lock`.                                                          |
 | `missing`    | git still tracks the worktree but its folder is gone; deleting cleans up git's records.   |
+| `unknown`    | A git check failed, so woma can't tell what deleting would lose. Treated as unsafe.      |
 
 A worktree is **safe** (what `m` and `--safe` select) when it is `merged`,
 `gone` or `missing`, deleting it loses nothing, and it is not locked.
+`no commits` worktrees are not considered safe: you probably just created
+them.
 
 Squash-merged branches show as `gone` with unpushed commits, because their
 commits never reached `main` as such. They are still safe to remove as
@@ -184,8 +190,10 @@ path:
 
 1. The folder comes from `worktree_dir` (default
    `{repo}/.worktrees/{name}`), where `{name}` is the branch with `/` turned
-   into `-`: `feat/login-page` → `.worktrees/feat-login-page`. Nested folders
-   are added to `.git/info/exclude` so they never show up as untracked files.
+   into `-`: `feat/login-page` → `.worktrees/feat-login-page`. Worktrees
+   created inside the repository are added to `.git/info/exclude` so they
+   never show up as untracked files. For bare repositories (`repo.git`, or a
+   `.bare` folder) `{repo}` is the folder that contains the git directory.
 2. If the branch exists locally or on a remote it is checked out; otherwise
    it is created from your current `HEAD` (or `--base`).
 3. Files matching `copy` (default `.env`, `.env.*`) are **copied, never
@@ -198,7 +206,7 @@ path:
 | Flag              | Effect                                                   |
 | ----------------- | -------------------------------------------------------- |
 | `--base <ref>`    | Create the branch from this ref instead of `HEAD`        |
-| `--path <dir>`    | Create the worktree here instead of `worktree_dir`       |
+| `--path <dir>`    | Create the worktree here instead of `worktree_dir` (relative paths are relative to `-C`) |
 | `--no-copy`       | Don't copy env files                                     |
 | `--no-install`    | Don't install dependencies                               |
 | `-C <dir>`        | Run as if started in `<dir>`                             |
@@ -306,6 +314,7 @@ editor = "code"
 
 # Where `woma new` creates worktrees. {repo} is the main checkout's path,
 # {repo_name} its folder name, {name} the branch with "/" turned into "-".
+# Relative paths are relative to the main checkout.
 worktree_dir = "{repo}/.worktrees/{name}"
 # e.g. siblings of the repository instead:
 # worktree_dir = "{repo}/../{repo_name}-{name}"
@@ -324,7 +333,14 @@ install = ""
   The main checkout of a repository is never shown or deleted, and woma only
   wipes folders that have a worktree's `.git` file.
 - Deleting a worktree removes its folder and git's record of it, like
-  `git worktree remove --force`.
+  `git worktree remove --force`. woma first moves the folder aside and has
+  git unregister it, and only then deletes the files, so a failure leaves
+  the worktree untouched. If deletion is interrupted (e.g. the machine
+  sleeps), a hidden `.<name>.woma-deleting-*` folder may be left next to
+  where the worktree was; it's no longer a worktree and safe to delete.
+- Anything woma couldn't fully inspect is treated as unsafe: it is never
+  selected by `m` or `--safe`, `clean` skips it without `--force`, and its
+  branch is never deleted.
 - **Branches are kept** unless you ask for them to be deleted (`b` in the
   browser, `--delete-branch` in `clean`), and even then only merged or fully
   pushed branches are deleted.

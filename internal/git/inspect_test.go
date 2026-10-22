@@ -75,6 +75,11 @@ func TestInspect(t *testing.T) {
 	ctx := context.Background()
 	st := func(name string) Status { return Inspect(ctx, repo, wts[name]) }
 
+	for name := range wts {
+		if !st(name).Complete {
+			t.Errorf("%s: inspection incomplete", name)
+		}
+	}
 	if s := st("merged"); !s.Merged || s.Unpushed != 0 || s.Dirty {
 		t.Errorf("merged: %+v", s)
 	}
@@ -247,5 +252,79 @@ func TestCleanIgnored(t *testing.T) {
 		if (err == nil) != want {
 			t.Errorf("%s exists=%v, want %v", path, err == nil, want)
 		}
+	}
+}
+
+func TestInspectBranchFromRemoteIsNotFresh(t *testing.T) {
+	root := testutil.TempDir(t)
+	dir := filepath.Join(root, "api")
+	testutil.NewRepo(t, dir)
+	testutil.Git(t, dir, "remote", "add", "origin", filepath.Join(root, "unused"))
+	// Simulate a remote branch with a commit that was later merged into main.
+	testutil.Commit(t, dir, "f.txt", "feature work")
+	testutil.Git(t, dir, "update-ref", "refs/remotes/origin/feat", "HEAD")
+	testutil.Git(t, dir, "update-ref", "refs/remotes/origin/main", "HEAD")
+	testutil.Git(t, dir, "worktree", "add", "-q", filepath.Join(root, "feat"), "feat") // DWIM from origin/feat
+	testutil.Git(t, dir, "worktree", "add", "-q", filepath.Join(root, "fresh"), "-b", "fresh")
+
+	repo, err := LoadRepo(context.Background(), dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, wt := range repo.Worktrees {
+		s := Inspect(context.Background(), &repo, wt)
+		switch wt.Branch {
+		case "feat":
+			if !s.Merged || s.NoCommits {
+				t.Errorf("branch from remote: %+v", s)
+			}
+		case "fresh":
+			if s.Merged || !s.NoCommits {
+				t.Errorf("fresh branch: %+v", s)
+			}
+		}
+		if !s.Complete {
+			t.Errorf("%s: inspection incomplete", wt.Branch)
+		}
+	}
+}
+
+func TestInspectIncompleteOnGitErrors(t *testing.T) {
+	repo, wts := inspectFixture(t)
+	wt := wts["local"]
+	wt.Head = strings.Repeat("0", 40) // unknown commit: rev-list fails
+	if s := Inspect(context.Background(), repo, wt); s.Complete {
+		t.Errorf("expected incomplete status: %+v", s)
+	}
+	broken := wts["pushed"]
+	broken.Path = filepath.Join(t.TempDir(), "not-a-worktree") // git status fails
+	if s := Inspect(context.Background(), repo, broken); s.Complete {
+		t.Errorf("expected incomplete status: %+v", s)
+	}
+}
+
+func TestDepth(t *testing.T) {
+	for _, c := range []struct {
+		root, path string
+		want       int
+	}{
+		{"/", "/", 0}, {"/", "/usr", 1}, {"/", "/usr/local", 2},
+		{"/code", "/code/api", 1}, {"/code/", "/code/api/x", 2},
+	} {
+		if got := depth(c.root, c.path); got != c.want {
+			t.Errorf("depth(%q, %q) = %d, want %d", c.root, c.path, got, c.want)
+		}
+	}
+}
+
+func TestUntrackedFiles(t *testing.T) {
+	dir := filepath.Join(testutil.TempDir(t), "web")
+	testutil.NewRepo(t, dir)
+	testutil.Commit(t, dir, "tracked.txt", "x")
+	testutil.WriteFile(t, filepath.Join(dir, ".env"), 1)
+	testutil.WriteFile(t, filepath.Join(dir, "build", "out.js"), 1)
+	files, err := UntrackedFiles(dir)
+	if err != nil || strings.Join(files, ",") != ".env,build/" {
+		t.Fatalf("files = %v, %v", files, err)
 	}
 }

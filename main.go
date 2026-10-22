@@ -50,13 +50,27 @@ func main() {
 }
 
 func run(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
-	cfg, err := config.Load()
-	if err != nil {
-		return err
-	}
 	cmd, rest := "", args
 	if len(args) > 0 {
 		cmd, rest = args[0], args[1:]
+	}
+	// Commands that don't need the config keep working when it is broken.
+	switch cmd {
+	case "shell-init":
+		return runShellInit(rest, stdout)
+	case "config":
+		return runConfig(stdout)
+	case "version", "--version":
+		fmt.Fprintln(stdout, "woma", version)
+		return nil
+	case "help", "-h", "-help", "--help":
+		fmt.Fprint(stdout, usage)
+		return nil
+	}
+
+	cfg, err := config.Load()
+	if err != nil {
+		return err
 	}
 	switch cmd {
 	case "pick":
@@ -67,34 +81,30 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 		return runList(rest, cfg, stdout, stderr)
 	case "clean":
 		return runClean(rest, cfg, stdin, stdout, stderr)
-	case "shell-init":
-		return runShellInit(rest, stdout)
-	case "config":
-		return runConfig(cfg, stdout)
-	case "version", "--version":
-		fmt.Fprintln(stdout, "woma", version)
-		return nil
-	case "help", "-h", "-help", "--help":
-		fmt.Fprint(stdout, usage)
-		return nil
 	}
 	return runBrowse(args, cfg, stdout, stderr)
 }
 
 // parseArgs parses flags that may appear before, between or after
-// positional arguments, returning the positional ones.
+// positional arguments, returning the positional ones. Everything after
+// "--" is positional.
 func parseArgs(fs *flag.FlagSet, args []string) ([]string, error) {
 	var positional []string
 	for {
+		before := len(args)
 		if err := fs.Parse(args); err != nil {
 			return nil, err
 		}
-		args = fs.Args()
-		if len(args) == 0 {
+		rest := fs.Args()
+		if len(rest) == 0 {
 			return positional, nil
 		}
-		positional = append(positional, args[0])
-		args = args[1:]
+		// flag stops at "--" after consuming it.
+		if consumed := before - len(rest); consumed > 0 && args[consumed-1] == "--" {
+			return append(positional, rest...), nil
+		}
+		positional = append(positional, rest[0])
+		args = rest[1:]
 	}
 }
 

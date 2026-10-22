@@ -5,6 +5,8 @@ package core
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -77,9 +79,10 @@ func (e Entry) Stale(after time.Duration, now time.Time) bool {
 
 // LosesWork reports whether removing the worktree loses anything: uncommitted
 // changes, or commits on a detached HEAD that no branch or remote contains.
-// Commits on a branch are never lost because branches are kept.
+// Commits on a branch are never lost because branches are kept. When the
+// inspection was incomplete it assumes the worst.
 func (e Entry) LosesWork() bool {
-	return e.Status.Dirty || (e.WT.Branch == "" && e.Status.Unpushed > 0)
+	return !e.Status.Complete || e.Status.Dirty || (e.WT.Branch == "" && e.Status.Unpushed > 0)
 }
 
 // Safe reports whether the worktree looks done with (merged, its remote
@@ -93,7 +96,7 @@ func (e Entry) Safe() bool {
 // commits: it is merged into the default branch or fully pushed.
 func (e Entry) CanDeleteBranch() bool {
 	b := e.WT.Branch
-	return b != "" && b != e.Repo.BaseBranch && (e.Status.Merged || e.Status.Unpushed == 0)
+	return e.Status.Complete && b != "" && b != e.Repo.BaseBranch && (e.Status.Merged || e.Status.Unpushed == 0)
 }
 
 // LabelKind says how a label should be highlighted.
@@ -120,6 +123,7 @@ func (e Entry) Labels(staleAfter time.Duration, now time.Time) []Label {
 			l = append(l, Label{text, kind})
 		}
 	}
+	add(!e.Status.Complete, "unknown", LabelWarn)
 	add(e.WT.Prunable, "missing", LabelInfo)
 	add(e.WT.Locked, "locked", LabelDanger)
 	add(e.Status.Dirty, "modified", LabelWarn)
@@ -171,14 +175,31 @@ type Removal struct {
 
 // Remove deletes a worktree, reporting freed bytes as files are deleted.
 // With deleteBranch, its branch is deleted too when CanDeleteBranch allows.
+//
+// The folder is first renamed aside and git unregisters the worktree; only
+// then are files deleted. If git fails the folder is put back untouched, and
+// an interruption leaves at most a hidden ".<name>.woma-deleting-*" folder
+// that is no longer a worktree.
 func Remove(e Entry, deleteBranch bool, freed *atomic.Int64) Removal {
 	path := e.WT.Path
-	// Only wipe directories that are verifiably linked worktrees; git
-	// itself refuses to remove a main worktree.
-	if fsutil.IsLinkedWorktree(path) {
-		fsutil.RemoveContents(path, freed)
-	}
-	if err := git.RemoveWorktree(e.Repo.CommonDir, path); err != nil {
+	if _, err := os.Lstat(path); err == nil {
+		if !fsutil.IsLinkedWorktree(path) {
+			return Removal{Err: fmt.Errorf("%s is not a linked worktree", path)}
+		}
+		trash := filepath.Join(filepath.Dir(path), fmt.Sprintf(".%s.woma-deleting-%d", filepath.Base(path), time.Now().UnixNano()))
+		if err := os.Rename(path, trash); err != nil {
+			return Removal{Err: err}
+		}
+		if err := git.RemoveWorktree(e.Repo.CommonDir, path); err != nil {
+			if restoreErr := os.Rename(trash, path); restoreErr != nil {
+				err = fmt.Errorf("%v; restoring the folder also failed, it is at %s", err, trash)
+			}
+			return Removal{Err: err}
+		}
+		if err := fsutil.RemoveTree(trash, freed); err != nil {
+			return Removal{Err: fmt.Errorf("worktree removed from git, but %w", err)}
+		}
+	} else if err := git.RemoveWorktree(e.Repo.CommonDir, path); err != nil {
 		return Removal{Err: err}
 	}
 	var r Removal

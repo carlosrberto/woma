@@ -11,8 +11,10 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
+	"sync"
 	"sync/atomic"
 )
 
@@ -91,7 +93,6 @@ func Discover(ctx context.Context, roots []string, opts ScanOptions, p *ScanProg
 	}
 
 	for _, root := range roots {
-		rootDepth := strings.Count(filepath.Clean(root), string(filepath.Separator))
 		err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 			if ctxErr := ctx.Err(); ctxErr != nil {
 				return ctxErr
@@ -116,7 +117,7 @@ func Discover(ctx context.Context, roots []string, opts ScanOptions, p *ScanProg
 				}
 				p.Dirs.Add(1)
 				p.current.Store(&path)
-				if opts.MaxDepth > 0 && strings.Count(path, string(filepath.Separator))-rootDepth >= opts.MaxDepth {
+				if opts.MaxDepth > 0 && depth(root, path) >= opts.MaxDepth {
 					// Still look for a ".git" here, but go no deeper.
 					checkGitEntry(filepath.Join(path, ".git"), add)
 					return fs.SkipDir
@@ -136,16 +137,34 @@ func Discover(ctx context.Context, roots []string, opts ScanOptions, p *ScanProg
 		}
 	}
 
+	// Load repositories in parallel; most have no linked worktrees.
+	loaded := make([]Repo, len(commonDirs))
+	jobs := make(chan int, len(commonDirs))
+	for i := range commonDirs {
+		jobs <- i
+	}
+	close(jobs)
+	var wg sync.WaitGroup
+	for range min(runtime.NumCPU(), len(commonDirs)) {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for i := range jobs {
+				if repo, err := loadRepo(ctx, commonDirs[i]); err == nil {
+					loaded[i] = repo
+				}
+			}
+		}()
+	}
+	wg.Wait()
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	var repos []Repo
-	for _, dir := range commonDirs {
-		if err := ctx.Err(); err != nil {
-			return nil, err
+	for _, repo := range loaded {
+		if len(repo.Worktrees) > 0 {
+			repos = append(repos, repo)
 		}
-		repo, err := loadRepo(ctx, dir)
-		if err != nil || len(repo.Worktrees) == 0 {
-			continue
-		}
-		repos = append(repos, repo)
 	}
 	sort.Slice(repos, func(i, j int) bool {
 		if repos[i].Name != repos[j].Name {
@@ -154,6 +173,15 @@ func Discover(ctx context.Context, roots []string, opts ScanOptions, p *ScanProg
 		return repos[i].Path < repos[j].Path
 	})
 	return repos, nil
+}
+
+// depth is how many directory levels path is below root.
+func depth(root, path string) int {
+	rel, err := filepath.Rel(root, path)
+	if err != nil || rel == "." {
+		return 0
+	}
+	return strings.Count(rel, string(filepath.Separator)) + 1
 }
 
 func checkGitEntry(path string, add func(string)) {
@@ -230,7 +258,9 @@ func loadRepo(ctx context.Context, commonDir string) (Repo, error) {
 		CommonDir: commonDir,
 		Worktrees: wts[1:],
 	}
-	repo.BaseBranch, repo.BaseRefs = baseRefs(ctx, commonDir)
+	if len(repo.Worktrees) > 0 {
+		repo.BaseBranch, repo.BaseRefs = baseRefs(ctx, commonDir)
+	}
 	return repo, nil
 }
 
@@ -341,6 +371,22 @@ func BranchExists(dir, branch string) bool {
 	}
 	out, err := output(ctx, dir, "for-each-ref", "--format=%(refname)", "refs/remotes/*/"+branch)
 	return err == nil && strings.TrimSpace(out) != ""
+}
+
+// UntrackedFiles lists files in dir that git doesn't track, including ignored
+// ones. Folders without any tracked file are listed once, ending in "/".
+func UntrackedFiles(dir string) ([]string, error) {
+	out, err := output(context.Background(), dir, "ls-files", "--others", "--directory", "-z")
+	if err != nil {
+		return nil, err
+	}
+	var files []string
+	for _, f := range strings.Split(out, "\x00") {
+		if f != "" {
+			files = append(files, f)
+		}
+	}
+	return files, nil
 }
 
 // Lock locks a worktree so git won't prune or move it.

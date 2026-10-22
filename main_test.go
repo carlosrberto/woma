@@ -10,6 +10,7 @@ import (
 
 	"woma/internal/git"
 	"woma/internal/testutil"
+	"woma/internal/tui"
 )
 
 func TestMain(m *testing.M) {
@@ -137,7 +138,7 @@ func TestCleanWithBranches(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v\n%s", err, out)
 	}
-	if !strings.Contains(out, "removed "+displayPath(filepath.Join(root, "done"))+" and branch done") ||
+	if !strings.Contains(out, "removed "+tui.Tildify(filepath.Join(root, "done"))+" and branch done") ||
 		!strings.Contains(out, "kept branch wip") || !strings.Contains(out, "removed 2 worktree(s)") {
 		t.Errorf("output:\n%s", out)
 	}
@@ -242,4 +243,41 @@ func TestResolveRootsErrors(t *testing.T) {
 func exists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
+}
+
+func TestBrokenConfigKeepsBasicCommandsWorking(t *testing.T) {
+	cfgPath := filepath.Join(t.TempDir(), "config.toml")
+	os.WriteFile(cfgPath, []byte(`stale_after = "30days"`+"\n"), 0o644)
+	t.Setenv("WOMA_CONFIG", cfgPath)
+	for _, args := range [][]string{{"help"}, {"version"}, {"shell-init", "zsh"}} {
+		if _, _, err := woma(t, args...); err != nil {
+			t.Errorf("%v failed with broken config: %v", args, err)
+		}
+	}
+	out, _, err := woma(t, "config")
+	if err == nil || !strings.Contains(out, cfgPath) || !strings.Contains(err.Error(), "stale_after") {
+		t.Errorf("config should show the path and the problem: %q %v", out, err)
+	}
+	if _, _, err := woma(t, "list", t.TempDir()); err == nil {
+		t.Error("list should fail with a broken config")
+	}
+}
+
+func TestParseArgsDoubleDash(t *testing.T) {
+	for _, c := range []struct {
+		args []string
+		pos  string
+		json bool
+	}{
+		{[]string{"a", "--json", "b"}, "a,b", true},
+		{[]string{"--json", "--", "-odd", "--json"}, "-odd,--json", true},
+		{[]string{"a", "--", "-x", "c"}, "a,-x,c", false},
+	} {
+		fs := newFlagSet("t", "", &bytes.Buffer{})
+		asJSON := fs.Bool("json", false, "")
+		pos, err := parseArgs(fs, c.args)
+		if err != nil || strings.Join(pos, ",") != c.pos || *asJSON != c.json {
+			t.Errorf("%v: pos=%v json=%v err=%v", c.args, pos, *asJSON, err)
+		}
+	}
 }

@@ -34,6 +34,11 @@ type Status struct {
 
 	LastCommit time.Time
 	Subject    string
+
+	// Complete is set when every check that decides whether removing the
+	// worktree or its branch loses work succeeded. When false, callers must
+	// treat the worktree as unsafe.
+	Complete bool
 }
 
 // Inspect gathers the Status of a worktree. Errors from individual git
@@ -41,9 +46,12 @@ type Status struct {
 func Inspect(ctx context.Context, repo *Repo, wt Worktree) Status {
 	var s Status
 	dir := repo.CommonDir
+	ok := true
 
 	if !wt.Prunable {
-		if out, err := output(ctx, wt.Path, "status", "--porcelain"); err == nil {
+		out, err := output(ctx, wt.Path, "status", "--porcelain")
+		ok = err == nil
+		if ok {
 			for _, line := range strings.Split(strings.TrimRight(out, "\n"), "\n") {
 				if line == "" {
 					continue
@@ -69,7 +77,8 @@ func Inspect(ctx context.Context, repo *Repo, wt Worktree) Status {
 	}
 
 	if wt.Branch == "" {
-		s.Unpushed = countCommits(ctx, dir, wt.Head, "--branches", "--remotes")
+		n, err := countCommits(ctx, dir, wt.Head, "--branches", "--remotes")
+		s.Unpushed, s.Complete = n, ok && err == nil
 		return s
 	}
 
@@ -88,25 +97,30 @@ func Inspect(ctx context.Context, repo *Repo, wt Worktree) Status {
 		}
 		// A fresh branch is an ancestor of the default branch too; its
 		// reflog tells it apart.
-		if s.Merged && neverCommitted(ctx, dir, wt.Branch) {
+		if s.Merged && neverCommitted(ctx, dir, wt.Branch, s.Upstream) {
 			s.Merged, s.NoCommits = false, true
 		}
 	}
 	if !s.Merged {
-		s.Unpushed = countCommits(ctx, dir, wt.Head, append([]string{"--remotes"}, repo.BaseRefs...)...)
+		n, err := countCommits(ctx, dir, wt.Head, append([]string{"--remotes"}, repo.BaseRefs...)...)
+		s.Unpushed, ok = n, ok && err == nil
 	}
+	s.Complete = ok
 	return s
 }
 
 // neverCommitted reports whether the branch's reflog only records its
-// creation. Without a reflog (e.g. disabled) it returns false.
-func neverCommitted(ctx context.Context, dir, branch string) bool {
+// creation from a local ref (not from a remote branch, which may carry
+// commits of its own). Without a reflog (e.g. disabled) it returns false.
+func neverCommitted(ctx context.Context, dir, branch, upstream string) bool {
 	out, err := output(ctx, dir, "reflog", "show", "--format=%gs", "refs/heads/"+branch, "--")
 	if err != nil || strings.TrimSpace(out) == "" {
 		return false
 	}
 	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
-		if !strings.HasPrefix(line, "branch: Created from") {
+		source, ok := strings.CutPrefix(line, "branch: Created from ")
+		if !ok || strings.HasPrefix(source, "refs/remotes/") || (upstream != "" && source == upstream) ||
+			refExists(ctx, dir, "refs/remotes/"+source) {
 			return false
 		}
 	}
@@ -114,14 +128,13 @@ func neverCommitted(ctx context.Context, dir, branch string) bool {
 }
 
 // countCommits counts commits reachable from head but not from exclude.
-func countCommits(ctx context.Context, dir, head string, exclude ...string) int {
+func countCommits(ctx context.Context, dir, head string, exclude ...string) (int, error) {
 	args := append([]string{"rev-list", "--count", head, "--not"}, exclude...)
 	out, err := output(ctx, dir, args...)
 	if err != nil {
-		return 0
+		return 0, err
 	}
-	n, _ := strconv.Atoi(strings.TrimSpace(out))
-	return n
+	return strconv.Atoi(strings.TrimSpace(out))
 }
 
 // parseTrack parses %(upstream:track): "[gone]", "[ahead 1]",

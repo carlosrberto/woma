@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -45,34 +44,46 @@ func CreateWorktree(ctx context.Context, dir string, cfg config.Config, opts Cre
 		return "", fmt.Errorf("not inside a git repository: %w", err)
 	}
 
-	path := opts.Path
+	// For bare repositories {repo} is the folder holding the git dir, so
+	// worktrees don't end up inside it.
+	bare := isBare(repo)
+	repoDir := repo.Path
+	if bare {
+		repoDir = filepath.Dir(repo.Path)
+	}
+	// --path is relative to dir (like running there); worktree_dir is
+	// relative to the repository.
+	path, base := config.ExpandHome(opts.Path), dir
 	if path == "" {
-		path = strings.NewReplacer(
-			"{repo}", repo.Path,
+		path = config.ExpandHome(strings.NewReplacer(
+			"{repo}", repoDir,
 			"{repo_name}", repo.Name,
 			"{name}", WorktreeName(opts.Branch),
-		).Replace(cfg.WorktreeDir)
-		path = config.ExpandHome(path)
+		).Replace(cfg.WorktreeDir))
+		base = repoDir
 	}
-	if path, err = filepath.Abs(path); err != nil {
-		return "", err
+	if !filepath.IsAbs(path) {
+		if base, err = filepath.Abs(base); err != nil {
+			return "", err
+		}
+		path = filepath.Join(base, path)
 	}
+	path = filepath.Clean(path)
 	if _, err := os.Lstat(path); err == nil {
 		return "", fmt.Errorf("%s already exists", path)
 	}
 
-	bare := isBare(repo)
 	if !bare {
 		if err := excludeFromRepo(repo, path); err != nil {
 			fmt.Fprintf(opts.Log, "warning: could not update .git/info/exclude: %v\n", err)
 		}
 	}
 
-	base := opts.Base
-	if base == "" && !git.BranchExists(dir, opts.Branch) {
-		base = "HEAD"
+	from := opts.Base
+	if from == "" && !git.BranchExists(dir, opts.Branch) {
+		from = "HEAD"
 	}
-	if err := git.AddWorktree(dir, path, opts.Branch, base); err != nil {
+	if err := git.AddWorktree(dir, path, opts.Branch, from); err != nil {
 		return "", err
 	}
 	fmt.Fprintf(opts.Log, "created worktree %s (branch %s)\n", path, opts.Branch)
@@ -100,7 +111,7 @@ func excludeFromRepo(repo git.Repo, path string) error {
 	if err != nil || rel == "." || strings.HasPrefix(rel, "..") {
 		return nil
 	}
-	entry := "/" + filepath.ToSlash(strings.Split(rel, string(filepath.Separator))[0]) + "/"
+	entry := "/" + filepath.ToSlash(rel) + "/"
 	exclude := filepath.Join(repo.CommonDir, "info", "exclude")
 	b, err := os.ReadFile(exclude)
 	if err != nil && !os.IsNotExist(err) {
@@ -124,46 +135,39 @@ func excludeFromRepo(repo git.Repo, path string) error {
 	return err
 }
 
-// copyFiles copies files whose name matches patterns from src into the same
-// relative location in dst, when missing there. Nested repositories,
-// worktrees and node_modules are skipped. It returns the copied paths.
+// copyFiles copies untracked files whose name matches patterns from src
+// into the same relative location in dst, when missing there. git lists the
+// candidates, so large ignored folders aren't walked. Folders without any
+// tracked file don't exist in a fresh checkout, so they are skipped. It
+// returns the copied paths.
 func copyFiles(src, dst string, patterns []string) []string {
 	if len(patterns) == 0 {
 		return nil
 	}
+	files, err := git.UntrackedFiles(src)
+	if err != nil {
+		return nil
+	}
 	var copied []string
-	_ = filepath.WalkDir(src, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return nil
+	for _, rel := range files {
+		rel = filepath.FromSlash(rel)
+		if strings.HasSuffix(rel, string(filepath.Separator)) || !matchesAny(filepath.Base(rel), patterns) {
+			continue
 		}
-		if d.IsDir() {
-			if path == src {
-				return nil
-			}
-			if d.Name() == "node_modules" || d.Name() == ".git" {
-				return fs.SkipDir
-			}
-			if _, err := os.Lstat(filepath.Join(path, ".git")); err == nil {
-				return fs.SkipDir // nested repository or worktree
-			}
-			return nil
+		source, target := filepath.Join(src, rel), filepath.Join(dst, rel)
+		if info, err := os.Lstat(source); err != nil || !info.Mode().IsRegular() {
+			continue
 		}
-		if !d.Type().IsRegular() || !matchesAny(d.Name(), patterns) {
-			return nil
-		}
-		rel, _ := filepath.Rel(src, path)
-		target := filepath.Join(dst, rel)
 		if _, err := os.Lstat(target); err == nil {
-			return nil // tracked or already there
+			continue // already there
 		}
 		if _, err := os.Stat(filepath.Dir(target)); err != nil {
-			return nil // folder doesn't exist in the new checkout
+			continue
 		}
-		if copyFile(path, target) == nil {
+		if copyFile(source, target) == nil {
 			copied = append(copied, rel)
 		}
-		return nil
-	})
+	}
 	return copied
 }
 

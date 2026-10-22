@@ -65,8 +65,13 @@ wnew() { local dir; dir="$(command woma new "$@")" && [ -n "$dir" ] && cd -- "$d
 	return nil
 }
 
-func runConfig(cfg config.Config, stdout io.Writer) error {
+func runConfig(stdout io.Writer) error {
 	path := config.Path()
+	cfg, err := config.Load()
+	if err != nil {
+		fmt.Fprintf(stdout, "# %s (invalid)\n", path)
+		return err
+	}
 	state := "not found, using defaults"
 	if _, err := os.Stat(path); err == nil {
 		state = "loaded"

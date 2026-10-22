@@ -122,14 +122,34 @@ func (m *Model) matches(it *item) bool {
 }
 
 func (m *Model) confirmDelete() {
+	m.autoSelected = nil
 	if len(m.selected()) == 0 {
 		if it := m.current(); it != nil {
 			it.selected = true
+			m.autoSelected = it
 		}
 	}
-	if len(m.selected()) > 0 {
-		m.state = stateConfirmDelete
+	sel := m.selected()
+	if len(sel) == 0 {
+		return
 	}
+	// Whether deleting loses work is only known once inspected.
+	for _, it := range sel {
+		if !it.inspected {
+			m.setFlash("still inspecting "+it.name+"; try again in a moment", true)
+			m.cancelDelete()
+			return
+		}
+	}
+	m.state = stateConfirmDelete
+}
+
+func (m *Model) cancelDelete() {
+	if m.autoSelected != nil {
+		m.autoSelected.selected = false
+		m.autoSelected = nil
+	}
+	m.state = stateList
 }
 
 // selectSafe selects every visible worktree that is safe to remove, or

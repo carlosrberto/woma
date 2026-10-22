@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync/atomic"
@@ -25,6 +26,7 @@ var now = time.Date(2026, 6, 1, 12, 0, 0, 0, time.UTC)
 func entry(mod func(*Entry)) Entry {
 	e := Entry{Repo: &git.Repo{BaseBranch: "main"}, WT: git.Worktree{Branch: "feature-x", Head: "abc"}}
 	e.Status.LastCommit = now.Add(-time.Hour)
+	e.Status.Complete = true
 	if mod != nil {
 		mod(&e)
 	}
@@ -47,6 +49,8 @@ func TestSafety(t *testing.T) {
 		{"unpushed", entry(func(e *Entry) { e.Status.Unpushed = 3 }), false, false, false},
 		{"detached orphan", entry(func(e *Entry) { e.WT.Branch, e.Status.Unpushed, e.Status.Merged = "", 1, true }), false, true, false},
 		{"base branch", entry(func(e *Entry) { e.WT.Branch, e.Status.Merged = "main", true }), true, false, false},
+		{"not inspected", Entry{Repo: &git.Repo{}, WT: git.Worktree{Branch: "x"}}, false, true, false},
+		{"inspection failed", entry(func(e *Entry) { e.Status.Merged, e.Status.Complete = true, false }), false, true, false},
 	}
 	for _, c := range cases {
 		if got := c.e.Safe(); got != c.safe {
@@ -218,19 +222,24 @@ func TestCreateWorktree(t *testing.T) {
 		t.Error(".env must be copied, not symlinked")
 	}
 	exclude, _ := os.ReadFile(filepath.Join(dir, ".git", "info", "exclude"))
-	if strings.Count(string(exclude), "/.worktrees/") != 1 {
+	if strings.Count(string(exclude), "\n/.worktrees/feat-login-page/\n") != 1 {
 		t.Errorf("exclude = %q", exclude)
 	}
+	if out, _ := exec.Command("git", "-C", dir, "status", "--porcelain").Output(); strings.Contains(string(out), ".worktrees") {
+		t.Errorf("worktree shows as untracked: %s", out)
+	}
 
-	// A second worktree doesn't duplicate the exclude entry; existing branches
-	// are checked out instead of created.
+	// Existing branches are checked out instead of created.
 	testutil.Git(t, dir, "branch", "existing")
 	cfg.Install = "none"
 	if _, err := CreateWorktree(context.Background(), dir, cfg, CreateOptions{Branch: "existing"}); err != nil {
 		t.Fatal(err)
 	}
+	// Excluding the same path twice doesn't duplicate it.
+	repo, _ := git.LoadRepo(context.Background(), dir)
+	excludeFromRepo(repo, filepath.Join(dir, ".worktrees", "existing"))
 	exclude, _ = os.ReadFile(filepath.Join(dir, ".git", "info", "exclude"))
-	if strings.Count(string(exclude), "/.worktrees/") != 1 {
+	if strings.Count(string(exclude), "/.worktrees/existing/") != 1 {
 		t.Errorf("exclude duplicated: %q", exclude)
 	}
 	if _, err := CreateWorktree(context.Background(), dir, cfg, CreateOptions{Branch: "existing"}); err == nil {
@@ -277,5 +286,83 @@ func TestInstallCommand(t *testing.T) {
 	}
 	if got := InstallCommand(dir, "make deps"); got != "make deps" {
 		t.Errorf("configured: %q", got)
+	}
+}
+
+func TestRemoveRestoresFolderWhenGitFails(t *testing.T) {
+	_, repos := repoWithWorktrees(t)
+	var e Entry
+	InspectAll(context.Background(), repos, func(x Entry) {
+		if x.WT.Branch == "wip" {
+			e = x
+		}
+	})
+	broken := *e.Repo
+	broken.CommonDir = filepath.Join(t.TempDir(), "not-a-repo")
+	e.Repo = &broken
+	var freed atomic.Int64
+	if r := Remove(e, false, &freed); r.Err == nil {
+		t.Fatal("expected git to fail")
+	}
+	if _, err := os.Stat(filepath.Join(e.WT.Path, "data.bin")); err != nil {
+		t.Fatal("folder must be restored untouched when git fails")
+	}
+	if freed.Load() != 0 {
+		t.Errorf("freed %d although nothing was deleted", freed.Load())
+	}
+	entries, _ := os.ReadDir(filepath.Dir(e.WT.Path))
+	for _, de := range entries {
+		if strings.Contains(de.Name(), "woma-deleting") {
+			t.Errorf("leftover %s", de.Name())
+		}
+	}
+}
+
+func TestRemoveRefusesMainCheckout(t *testing.T) {
+	_, repos := repoWithWorktrees(t)
+	e := Entry{Repo: &repos[0], WT: git.Worktree{Path: repos[0].Path, Branch: "main"}}
+	var freed atomic.Int64
+	if r := Remove(e, false, &freed); r.Err == nil {
+		t.Fatal("removing the main checkout must fail")
+	}
+	if _, err := os.Stat(filepath.Join(repos[0].Path, ".git")); err != nil {
+		t.Fatal("main checkout was damaged")
+	}
+}
+
+func TestCreateWorktreeRelativePathUsesDir(t *testing.T) {
+	root := testutil.TempDir(t)
+	dir := filepath.Join(root, "code", "app")
+	testutil.NewRepo(t, dir)
+	cfg := config.Default()
+	path, err := CreateWorktree(context.Background(), dir, cfg, CreateOptions{Branch: "feat", Path: "../app-feat", NoInstall: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := filepath.Join(root, "code", "app-feat"); path != want {
+		t.Errorf("path = %s, want %s", path, want)
+	}
+	cfg.WorktreeDir = "../{repo_name}-{name}"
+	path, err = CreateWorktree(context.Background(), filepath.Join(dir), cfg, CreateOptions{Branch: "other", NoInstall: true})
+	if err != nil || path != filepath.Join(root, "code", "app-other") {
+		t.Errorf("relative worktree_dir: %s, %v", path, err)
+	}
+}
+
+func TestCreateWorktreeBareRepo(t *testing.T) {
+	root := testutil.TempDir(t)
+	src := filepath.Join(root, "src")
+	testutil.NewRepo(t, src)
+	project := filepath.Join(root, "project")
+	os.MkdirAll(project, 0o755)
+	testutil.Git(t, project, "clone", "-q", "--bare", src, ".bare")
+	os.WriteFile(filepath.Join(project, ".git"), []byte("gitdir: ./.bare\n"), 0o644)
+
+	path, err := CreateWorktree(context.Background(), project, config.Default(), CreateOptions{Branch: "feat", NoInstall: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := filepath.Join(project, ".worktrees", "feat"); path != want {
+		t.Errorf("path = %s, want %s (not inside the bare git dir)", path, want)
 	}
 }

@@ -54,10 +54,11 @@ func collect(roots []string, cfg config.Config, filter core.Filter, stderr io.Wr
 	ctx := context.Background()
 	progress := &git.ScanProgress{}
 	showProgress := isTerminal(stderr)
-	done := make(chan struct{})
+	done, stopped := make(chan struct{}), make(chan struct{})
 	var inspected, total int
 	if showProgress {
 		go func() {
+			defer close(stopped)
 			t := time.NewTicker(100 * time.Millisecond)
 			defer t.Stop()
 			for {
@@ -70,9 +71,12 @@ func collect(roots []string, cfg config.Config, filter core.Filter, stderr io.Wr
 				}
 			}
 		}()
+	} else {
+		close(stopped)
 	}
 	repos, err := git.Discover(ctx, roots, git.ScanOptions{Ignore: cfg.Ignore, MaxDepth: cfg.MaxDepth}, progress)
 	close(done)
+	<-stopped // the scan line is cleared before inspection progress starts
 	if err != nil {
 		return nil, err
 	}
@@ -178,7 +182,7 @@ func runList(args []string, cfg config.Config, stdout, stderr io.Writer) error {
 	var total int64
 	for _, e := range entries {
 		total += e.Size
-		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\n", e.Repo.Name, displayPath(e.WT.Path), branchName(e.WT),
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\n", e.Repo.Name, tui.Tildify(e.WT.Path), tui.BranchLabel(e.WT),
 			tui.Age(e.LastActivity(), now), tui.HumanBytes(e.Size), labelText(e, stale, now))
 	}
 	tw.Flush()
@@ -192,23 +196,4 @@ func labelText(e core.Entry, stale time.Duration, now time.Time) string {
 		parts = append(parts, l.Text)
 	}
 	return strings.Join(parts, ",")
-}
-
-func branchName(wt git.Worktree) string {
-	if wt.Branch != "" {
-		return wt.Branch
-	}
-	if len(wt.Head) >= 7 {
-		return "(detached " + wt.Head[:7] + ")"
-	}
-	return "(detached)"
-}
-
-func displayPath(path string) string {
-	if home, err := os.UserHomeDir(); err == nil {
-		if rest, ok := strings.CutPrefix(path, home+string(os.PathSeparator)); ok {
-			return "~" + string(os.PathSeparator) + rest
-		}
-	}
-	return path
 }

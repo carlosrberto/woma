@@ -148,6 +148,10 @@ type Model struct {
 	removed      int
 	freedSize    int64
 
+	// autoSelected is the item confirmDelete selected because nothing was;
+	// cancelling unselects it again.
+	autoSelected *item
+
 	cleanTarget *item
 	cleanFiles  []string
 	moveInput   textinput.Model
@@ -256,7 +260,10 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.startInspecting()
 
 	case inspectMsg:
-		msg.it.e, msg.it.inspected = msg.e, true
+		// Only take what inspection measured: the worktree itself (path,
+		// lock) may have changed through an action since the job started.
+		it := msg.it
+		it.e.Size, it.e.Newest, it.e.Status, it.inspected = msg.e.Size, msg.e.Newest, msg.e.Status, true
 		if msg.initial {
 			m.inspectDone++
 		}
@@ -307,6 +314,11 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.KeyMsg:
 		if msg.String() == "ctrl+c" {
+			if m.state == stateDeleting && !m.finished {
+				// Quitting now would kill deletions halfway.
+				m.setFlash("deleting… ctrl+c is disabled until it finishes", true)
+				return m, nil
+			}
 			m.cancel()
 			return m, tea.Quit
 		}

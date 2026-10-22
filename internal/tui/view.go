@@ -33,7 +33,7 @@ func (m *Model) View() string {
 func (m *Model) title() string {
 	roots := make([]string, len(m.opts.Roots))
 	for i, r := range m.opts.Roots {
-		roots[i] = tildify(r)
+		roots[i] = Tildify(r)
 	}
 	t := styles.title.Render("woma")
 	if m.opts.Pick {
@@ -49,7 +49,7 @@ func (m *Model) viewScanning() string {
 	fmt.Fprintf(&b, "   %s directories · %s repositories\n",
 		styles.bold.Render(fmt.Sprint(m.scan.Dirs.Load())),
 		styles.bold.Render(fmt.Sprint(m.scan.Found.Load())))
-	b.WriteString("   " + styles.dim.Render(truncLeft(tildify(m.scan.Current()), m.width-4)) + "\n")
+	b.WriteString("   " + styles.dim.Render(truncLeft(Tildify(m.scan.Current()), m.width-4)) + "\n")
 	return b.String()
 }
 
@@ -139,7 +139,7 @@ func (m *Model) columnWidths(items []*item) (nameW, branchW int) {
 	maxName, maxBranch := 4, 6
 	for _, it := range items {
 		maxName = max(maxName, lipgloss.Width(it.name))
-		maxBranch = max(maxBranch, lipgloss.Width(branchLabel(it.wt())))
+		maxBranch = max(maxBranch, lipgloss.Width(BranchLabel(it.wt())))
 	}
 	// pointer, checkbox, age, size, labels and gaps take ~50 columns.
 	avail := max(20, m.width-50)
@@ -153,7 +153,7 @@ func (m *Model) renderRow(r row, isCursor bool, nameW, branchW int) string {
 		g := r.group
 		items := m.visibleIn(g)
 		info := fmt.Sprintf("  %d %s · %s", len(items), plural(len(items), "worktree"), sizeLabel(items))
-		path := tildify(g.repo.Path)
+		path := Tildify(g.repo.Path)
 		for _, root := range m.opts.Roots {
 			if rel, ok := within(root, g.repo.Path); ok {
 				path = rel
@@ -176,7 +176,7 @@ func (m *Model) renderRow(r row, isCursor bool, nameW, branchW int) string {
 	if it.selected {
 		box = styles.check.Render("[x]")
 	}
-	branch := styles.dim.Render(pad(truncRight(branchLabel(it.wt()), branchW), branchW))
+	branch := styles.dim.Render(pad(truncRight(BranchLabel(it.wt()), branchW), branchW))
 	return "  " + pointer + box + " " + name + "  " + branch + "  " + m.ageCell(it) + "  " + sizeCell(it) + "  " + m.labels(it)
 }
 
@@ -198,6 +198,9 @@ func sizeCell(it *item) string {
 }
 
 func (m *Model) labels(it *item) string {
+	if !it.inspected {
+		return ""
+	}
 	var parts []string
 	for _, l := range it.e.Labels(m.opts.Config.StaleDuration(), m.now()) {
 		parts = append(parts, labelStyle(l.Kind).Render(l.Text))
@@ -217,13 +220,13 @@ func (m *Model) viewDetail() string {
 	switch {
 	case it == nil:
 	case !it.inspected:
-		field("path", tildify(it.wt().Path))
+		field("path", Tildify(it.wt().Path))
 		field("", m.spinner.View()+"inspecting…")
 	default:
 		e, s, now := it.e, it.e.Status, m.now()
-		field("path", tildify(e.WT.Path))
+		field("path", Tildify(e.WT.Path))
 
-		branch := branchLabel(e.WT)
+		branch := BranchLabel(e.WT)
 		switch {
 		case s.Gone:
 			branch += styles.ok.Render("  upstream deleted (gone)")
@@ -305,7 +308,7 @@ func (m *Model) viewConfirmDelete() string {
 	nameW, branchW := m.columnWidths(shown)
 	for _, it := range shown {
 		label := pad(truncLeft(it.e.Repo.Name+": "+it.name, nameW+12), nameW+12)
-		branch := styles.dim.Render(pad(truncRight(branchLabel(it.wt()), branchW), branchW))
+		branch := styles.dim.Render(pad(truncRight(BranchLabel(it.wt()), branchW), branchW))
 		line := fmt.Sprintf("   %s  %s  %s  %s", label, branch, sizeCell(it), m.labels(it))
 		if m.deleteBranch && it.wt().Branch != "" {
 			if it.e.CanDeleteBranch() {

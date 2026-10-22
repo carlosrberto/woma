@@ -73,7 +73,7 @@ func (m *Model) displayPath(r *git.Repo, path string) string {
 			return rel
 		}
 	}
-	return tildify(path)
+	return Tildify(path)
 }
 
 func within(base, path string) (string, bool) {
@@ -84,7 +84,8 @@ func within(base, path string) (string, bool) {
 	return rel, true
 }
 
-func tildify(path string) string {
+// Tildify shortens paths under the home directory to ~/…
+func Tildify(path string) string {
 	home, err := os.UserHomeDir()
 	if err != nil || home == "" {
 		return path
@@ -179,7 +180,8 @@ func truncRight(s string, w int) string {
 	return string(r[:w-1]) + "…"
 }
 
-func branchLabel(wt git.Worktree) string {
+// BranchLabel names a worktree's branch, or its detached commit.
+func BranchLabel(wt git.Worktree) string {
 	if wt.Branch != "" {
 		return wt.Branch
 	}

@@ -70,14 +70,15 @@ func (m *Model) rescan() tea.Cmd {
 	return tea.Batch(m.startScan(), m.startSpinner())
 }
 
-// runOp runs fn in the background with a spinner and status text.
-func (m *Model) runOp(desc string, fn func() opMsg) tea.Cmd {
+// runOp runs fn in the background with a spinner and status text. Only one
+// action runs at a time.
+func (m *Model) runOp(desc string, fn func() tea.Msg) tea.Cmd {
 	if m.opRunning != "" {
 		m.setFlash("wait for "+m.opRunning+" to finish", true)
 		return nil
 	}
 	m.opRunning = desc
-	return tea.Batch(func() tea.Msg { return fn() }, m.startSpinner())
+	return tea.Batch(fn, m.startSpinner())
 }
 
 func (m *Model) confirmDeleteKey(msg tea.KeyMsg) tea.Cmd {
@@ -87,12 +88,13 @@ func (m *Model) confirmDeleteKey(msg tea.KeyMsg) tea.Cmd {
 	case "b":
 		m.deleteBranch = !m.deleteBranch
 	case "n", "N", "esc", "q":
-		m.state = stateList
+		m.cancelDelete()
 	}
 	return nil
 }
 
 func (m *Model) startDelete() tea.Cmd {
+	m.autoSelected = nil
 	sel := m.selected()
 	m.state = stateDeleting
 	m.deleting, m.deleted, m.finished = sel, 0, false
@@ -188,7 +190,7 @@ func (m *Model) openTmux() tea.Cmd {
 		return nil
 	}
 	path, name := it.wt().Path, filepath.Base(it.wt().Path)
-	return m.runOp("opening tmux window", func() opMsg {
+	return m.runOp("opening tmux window", func() tea.Msg {
 		out, err := exec.Command("tmux", "new-window", "-c", path, "-n", name).CombinedOutput()
 		if err != nil {
 			return opMsg{err: fmt.Errorf("tmux: %s", strings.TrimSpace(string(out)))}
@@ -203,15 +205,10 @@ func (m *Model) previewClean() tea.Cmd {
 		return nil
 	}
 	path, keep := it.wt().Path, m.opts.Config.Copy
-	if m.opRunning != "" {
-		m.setFlash("wait for "+m.opRunning+" to finish", true)
-		return nil
-	}
-	m.opRunning = "looking for build artifacts"
-	return tea.Batch(func() tea.Msg {
+	return m.runOp("looking for build artifacts", func() tea.Msg {
 		files, err := git.CleanIgnored(path, keep, true)
 		return cleanPreviewMsg{it, files, err}
-	}, m.startSpinner())
+	})
 }
 
 func (m *Model) confirmCleanKey(msg tea.KeyMsg) tea.Cmd {
@@ -220,7 +217,7 @@ func (m *Model) confirmCleanKey(msg tea.KeyMsg) tea.Cmd {
 		m.state = stateList
 		it, keep := m.cleanTarget, m.opts.Config.Copy
 		path, name, before := it.wt().Path, it.name, it.e.Size
-		return m.runOp("cleaning "+name, func() opMsg {
+		return m.runOp("cleaning "+name, func() tea.Msg {
 			if _, err := git.CleanIgnored(path, keep, false); err != nil {
 				return opMsg{err: fmt.Errorf("clean: %w", err)}
 			}
@@ -239,10 +236,12 @@ func (m *Model) toggleLock() tea.Cmd {
 	}
 	common, path, name, locked := it.e.Repo.CommonDir, it.wt().Path, it.name, it.wt().Locked
 	verb := map[bool]string{true: "unlocked", false: "locked"}[locked]
-	return m.runOp("updating lock", func() opMsg {
-		err := git.Lock(common, path)
+	return m.runOp("updating lock", func() tea.Msg {
+		var err error
 		if locked {
 			err = git.Unlock(common, path)
+		} else {
+			err = git.Lock(common, path)
 		}
 		return opMsg{it: it, err: err, flash: verb + " " + name, apply: func() { it.e.WT.Locked = !locked }}
 	})
@@ -274,10 +273,16 @@ func (m *Model) moveKey(msg tea.KeyMsg) tea.Cmd {
 		if err != nil || dest == it.wt().Path {
 			return nil
 		}
+		// git would move the worktree *into* an existing folder, leaving it
+		// somewhere other than dest.
+		if _, err := os.Lstat(dest); err == nil {
+			m.setFlash(Tildify(dest)+" already exists; choose a new path", true)
+			return nil
+		}
 		common, path := it.e.Repo.CommonDir, it.wt().Path
-		return m.runOp("moving "+it.name, func() opMsg {
+		return m.runOp("moving "+it.name, func() tea.Msg {
 			err := git.Move(common, path, dest)
-			return opMsg{it: it, err: err, flash: "moved to " + tildify(dest), apply: func() {
+			return opMsg{it: it, err: err, flash: "moved to " + Tildify(dest), apply: func() {
 				it.e.WT.Path = dest
 				it.name = m.displayPath(it.e.Repo, dest)
 			}}
@@ -294,7 +299,7 @@ func (m *Model) repair() tea.Cmd {
 		return nil
 	}
 	repo := *it.e.Repo
-	return m.runOp("repairing "+repo.Name, func() opMsg {
+	return m.runOp("repairing "+repo.Name, func() tea.Msg {
 		out, err := git.Repair(repo)
 		flash := "repaired " + repo.Name
 		if out != "" {
