@@ -254,7 +254,7 @@ woma list --json | jq '.[] | select(.safe) | .path'
 ```
 
 JSON fields: `repo`, `repo_path`, `path`, `branch`, `head`, `upstream`,
-`size` (bytes), `last_activity`, `merged`, `gone`, `stale`, `dirty`,
+`size` (bytes), `last_activity`, `merged`, `no_commits`, `gone`, `stale`, `dirty`,
 `locked`, `missing`, `ahead`, `behind`, `unpushed`, `safe`.
 
 ### `woma clean [path...]`

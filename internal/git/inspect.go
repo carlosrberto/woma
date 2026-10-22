@@ -109,22 +109,39 @@ func Inspect(ctx context.Context, repo *Repo, wt Worktree) Status {
 	return s
 }
 
-// neverCommitted reports whether the branch's reflog only records its
-// creation from a local ref (not from a remote branch, which may carry
-// commits of its own). Without a reflog (e.g. disabled) it returns false.
+// neverCommitted reports whether the branch was created but never moved by
+// work of its own, judging by its reflog: every entry is either its
+// creation from some starting point (HEAD, main, origin/main, a tag, …) or
+// a rename. Creating it from a remote branch of the same name (checking out
+// someone's pushed branch) brings that branch's commits along, so it doesn't
+// count. Without a reflog (e.g. disabled or expired) it returns false.
 func neverCommitted(ctx context.Context, dir, branch, upstream string) bool {
 	out, err := output(ctx, dir, "reflog", "show", "--format=%gs", "refs/heads/"+branch, "--")
 	if err != nil || strings.TrimSpace(out) == "" {
 		return false
 	}
 	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
+		if strings.HasPrefix(strings.ToLower(line), "branch: renamed ") {
+			continue
+		}
 		source, ok := strings.CutPrefix(line, "branch: Created from ")
-		if !ok || strings.HasPrefix(source, "refs/remotes/") || (upstream != "" && source == upstream) ||
-			refExists(ctx, dir, "refs/remotes/"+source) {
+		if !ok || sameBranchOnRemote(source, branch, upstream) {
 			return false
 		}
 	}
 	return true
+}
+
+// sameBranchOnRemote reports whether ref (as written in a reflog) is a
+// remote-tracking copy of branch, e.g. "origin/feat-x" or
+// "refs/remotes/origin/feat-x" for "feat-x".
+func sameBranchOnRemote(ref, branch, upstream string) bool {
+	ref = strings.TrimPrefix(ref, "refs/remotes/")
+	if upstream != "" && ref == upstream && strings.HasSuffix(upstream, "/"+branch) {
+		return true
+	}
+	_, name, ok := strings.Cut(ref, "/")
+	return ok && name == branch
 }
 
 // countCommits counts commits reachable from head but not from exclude.

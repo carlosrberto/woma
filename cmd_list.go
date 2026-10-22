@@ -123,6 +123,7 @@ type jsonEntry struct {
 	Size         int64     `json:"size"`
 	LastActivity time.Time `json:"last_activity,omitzero"`
 	Merged       bool      `json:"merged"`
+	NoCommits    bool      `json:"no_commits"`
 	Gone         bool      `json:"gone"`
 	Stale        bool      `json:"stale"`
 	Dirty        bool      `json:"dirty"`
@@ -163,7 +164,7 @@ func runList(args []string, cfg config.Config, stdout, stderr io.Writer) error {
 			out = append(out, jsonEntry{
 				Repo: e.Repo.Name, RepoPath: e.Repo.Path, Path: e.WT.Path, Branch: e.WT.Branch, Head: e.WT.Head,
 				Upstream: e.Status.Upstream, Size: e.Size, LastActivity: e.LastActivity(),
-				Merged: e.Status.Merged, Gone: e.Status.Gone, Stale: e.Stale(stale, now), Dirty: e.Status.Dirty,
+				Merged: e.Status.Merged, NoCommits: e.Status.NoCommits, Gone: e.Status.Gone, Stale: e.Stale(stale, now), Dirty: e.Status.Dirty,
 				Locked: e.WT.Locked, Missing: e.WT.Prunable, Ahead: e.Status.Ahead, Behind: e.Status.Behind,
 				Unpushed: e.Status.Unpushed, Safe: e.Safe(),
 			})

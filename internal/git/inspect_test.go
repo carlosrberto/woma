@@ -328,3 +328,57 @@ func TestUntrackedFiles(t *testing.T) {
 		t.Fatalf("files = %v, %v", files, err)
 	}
 }
+
+// A branch created from origin/main and renamed (as tools that create
+// worktrees under a temporary name do), with no commits yet, is not merged
+// even though it is part of main's history, whatever its upstream.
+func TestInspectFreshBranchFromRemoteBase(t *testing.T) {
+	root := testutil.TempDir(t)
+	dir := filepath.Join(root, "api")
+	testutil.NewRepo(t, dir)
+	testutil.Git(t, dir, "remote", "add", "origin", filepath.Join(root, "unused"))
+	testutil.Commit(t, dir, "a.txt", "release 1.0")
+	testutil.Git(t, dir, "update-ref", "refs/remotes/origin/main", "HEAD")
+	testutil.Git(t, dir, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main")
+
+	// Created from origin/main under a temporary name, then renamed.
+	testutil.Git(t, dir, "worktree", "add", "-q", "--no-track", "-b", "worktree-feature-x", filepath.Join(root, "feature-x"), "origin/main")
+	testutil.Git(t, dir, "branch", "-m", "worktree-feature-x", "feature/x")
+	// Created from origin/main and tracking it.
+	testutil.Git(t, dir, "worktree", "add", "-q", "--track", "-b", "fix/y", filepath.Join(root, "fix-y"), "origin/main")
+	// Same, but then committed to and merged into main: really merged.
+	testutil.Git(t, dir, "worktree", "add", "-q", "--no-track", "-b", "done", filepath.Join(root, "done"), "origin/main")
+	testutil.Commit(t, filepath.Join(root, "done"), "d.txt", "done work")
+	testutil.Git(t, dir, "merge", "-q", "--no-edit", "done")
+
+	repo, err := LoadRepo(context.Background(), dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, wt := range repo.Worktrees {
+		s := Inspect(context.Background(), &repo, wt)
+		wantMerged := wt.Branch == "done"
+		if s.Merged != wantMerged || s.NoCommits == wantMerged {
+			t.Errorf("%s: merged=%v noCommits=%v (upstream %q)", wt.Branch, s.Merged, s.NoCommits, s.Upstream)
+		}
+	}
+}
+
+func TestSameBranchOnRemote(t *testing.T) {
+	for _, c := range []struct {
+		ref, branch, upstream string
+		want                  bool
+	}{
+		{"origin/feat-x", "feat-x", "", true},
+		{"refs/remotes/origin/feat/x", "feat/x", "", true},
+		{"upstream/feat/x", "feat/x", "upstream/feat/x", true},
+		{"origin/main", "feat/x", "origin/main", false},
+		{"refs/remotes/origin/main", "feat/x", "", false},
+		{"HEAD", "feat/x", "", false},
+		{"main", "main", "", false},
+	} {
+		if got := sameBranchOnRemote(c.ref, c.branch, c.upstream); got != c.want {
+			t.Errorf("sameBranchOnRemote(%q, %q, %q) = %v", c.ref, c.branch, c.upstream, got)
+		}
+	}
+}
