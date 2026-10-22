@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"woma/internal/testutil"
+	"github.com/carlosrberto/woma/internal/testutil"
 )
 
 // inspectFixture creates a repo with a remote and worktrees in every state

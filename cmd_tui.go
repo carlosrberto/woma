@@ -8,8 +8,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"woma/internal/config"
-	"woma/internal/tui"
+	"github.com/carlosrberto/woma/internal/config"
+	"github.com/carlosrberto/woma/internal/tui"
 )
 
 func runBrowse(args []string, cfg config.Config, stdout, stderr io.Writer) error {

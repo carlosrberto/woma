@@ -8,9 +8,9 @@ import (
 	"strings"
 	"testing"
 
-	"woma/internal/git"
-	"woma/internal/testutil"
-	"woma/internal/tui"
+	"github.com/carlosrberto/woma/internal/git"
+	"github.com/carlosrberto/woma/internal/testutil"
+	"github.com/carlosrberto/woma/internal/tui"
 )
 
 func TestMain(m *testing.M) {

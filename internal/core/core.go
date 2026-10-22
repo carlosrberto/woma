@@ -12,8 +12,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"woma/internal/fsutil"
-	"woma/internal/git"
+	"github.com/carlosrberto/woma/internal/fsutil"
+	"github.com/carlosrberto/woma/internal/git"
 )
 
 // Entry is a worktree with everything woma knows about it.

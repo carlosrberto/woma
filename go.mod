@@ -1,4 +1,4 @@
-module woma
+module github.com/carlosrberto/woma
 
 go 1.24.2
 

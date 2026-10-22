@@ -11,10 +11,10 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"woma/internal/config"
-	"woma/internal/core"
-	"woma/internal/fsutil"
-	"woma/internal/git"
+	"github.com/carlosrberto/woma/internal/config"
+	"github.com/carlosrberto/woma/internal/core"
+	"github.com/carlosrberto/woma/internal/fsutil"
+	"github.com/carlosrberto/woma/internal/git"
 )
 
 const maxParallelDeletes = 3

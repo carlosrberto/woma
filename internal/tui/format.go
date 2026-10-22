@@ -11,8 +11,8 @@ import (
 	"github.com/charmbracelet/bubbles/progress"
 	"github.com/charmbracelet/lipgloss"
 
-	"woma/internal/core"
-	"woma/internal/git"
+	"github.com/carlosrberto/woma/internal/core"
+	"github.com/carlosrberto/woma/internal/git"
 )
 
 type styleSet struct {

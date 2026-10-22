@@ -11,10 +11,11 @@ import (
 	"os"
 	"path/filepath"
 
-	"woma/internal/config"
+	"github.com/carlosrberto/woma/internal/config"
 )
 
-const version = "0.1.0"
+// version is set by a release build: -ldflags "-X main.version=1.0.0".
+var version = "0.1.0"
 
 const usage = `woma: git worktree manager
 

@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"woma/internal/testutil"
+	"github.com/carlosrberto/woma/internal/testutil"
 )
 
 func TestMeasureHardLinks(t *testing.T) {

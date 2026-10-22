@@ -9,8 +9,8 @@ import (
 
 	"github.com/BurntSushi/toml"
 
-	"woma/internal/config"
-	"woma/internal/core"
+	"github.com/carlosrberto/woma/internal/config"
+	"github.com/carlosrberto/woma/internal/core"
 )
 
 func runNew(args []string, cfg config.Config, stdout, stderr io.Writer) error {

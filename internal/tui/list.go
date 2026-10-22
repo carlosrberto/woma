@@ -7,7 +7,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"woma/internal/git"
+	"github.com/carlosrberto/woma/internal/git"
 )
 
 func (m *Model) listKey(msg tea.KeyMsg) tea.Cmd {

@@ -41,20 +41,28 @@ woma  ~/code
 
 ## Install
 
-Requires [Go](https://go.dev/dl/) 1.24+ and `git` on your `PATH`.
+With Homebrew (macOS and Linux):
 
 ```sh
-git clone <this-repo> woma
-cd woma
-go install .                  # puts `woma` in $(go env GOPATH)/bin
+brew install carlosrberto/tap/woma
 ```
 
-Or build it in place and link it onto your `PATH`:
+Homebrew builds it from source (it gets Go for that), so it takes a
+minute or so, and macOS runs it without any security prompt. Or with Go
+1.24+:
 
 ```sh
-go build -o woma .
-ln -s "$PWD/woma" ~/.local/bin/woma
+go install github.com/carlosrberto/woma@latest   # puts `woma` in $(go env GOPATH)/bin
 ```
+
+Or a binary from [the releases](https://github.com/carlosrberto/woma/releases)
+(macOS and Linux, amd64 and arm64; check it against `checksums.txt`). On
+macOS a binary your browser downloaded is quarantined and refused:
+`xattr -d com.apple.quarantine woma` allows it (`curl -LO` doesn't
+quarantine).
+
+woma needs `git` on your `PATH`. Then add the [shell
+integration](#shell-integration-wcd-and-wnew) for `wcd` and `wnew`.
 
 ## Quick start
 
@@ -380,6 +388,9 @@ go test ./...        # run the tests
 go run . ~/code      # run without installing
 go build -o woma .   # build the binary
 ```
+
+[docs/releasing.md](docs/releasing.md) covers making a release and the
+Homebrew formula.
 
 The tests never touch your repositories or settings: each one builds
 throwaway repositories (and remotes) in a temporary directory, and git runs

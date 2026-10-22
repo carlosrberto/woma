@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"woma/internal/config"
-	"woma/internal/git"
-	"woma/internal/testutil"
+	"github.com/carlosrberto/woma/internal/config"
+	"github.com/carlosrberto/woma/internal/git"
+	"github.com/carlosrberto/woma/internal/testutil"
 )
 
 func TestMain(m *testing.M) {

@@ -14,10 +14,10 @@ import (
 
 	"github.com/charmbracelet/x/term"
 
-	"woma/internal/config"
-	"woma/internal/core"
-	"woma/internal/git"
-	"woma/internal/tui"
+	"github.com/carlosrberto/woma/internal/config"
+	"github.com/carlosrberto/woma/internal/core"
+	"github.com/carlosrberto/woma/internal/git"
+	"github.com/carlosrberto/woma/internal/tui"
 )
 
 type filterFlags struct {

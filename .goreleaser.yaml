@@ -1,0 +1,59 @@
+# woma's release: `goreleaser release --clean` on a vX.Y.Z tag (docs/releasing.md).
+# Binaries for macOS and Linux, amd64 and arm64, and checksums. Homebrew
+# builds from the tag's source instead (scripts/formula.sh): no
+# quarantine, no signing.
+version: 2
+
+project_name: woma
+
+before:
+  hooks:
+    - go mod tidy
+    - go test ./...
+
+builds:
+  - id: woma
+    main: .
+    binary: woma
+    env:
+      - CGO_ENABLED=0
+    goos: [darwin, linux]
+    goarch: [amd64, arm64]
+    flags: [-trimpath]
+    ldflags:
+      - -s -w -X main.version={{ .Version }}
+
+archives:
+  - id: woma
+    formats: [tar.gz]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - LICENSE
+      - README.md
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  sort: asc
+  use: git
+  groups:
+    - title: Features
+      regexp: '^.*?feat(\(.+\))??!?:.+$'
+      order: 0
+    - title: Fixes
+      regexp: '^.*?fix(\(.+\))??!?:.+$'
+      order: 1
+    - title: Other
+      order: 999
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - '^chore:'
+
+release:
+  github:
+    owner: carlosrberto
+    name: woma
+  draft: true # looked at, then published by hand

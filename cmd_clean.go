@@ -11,9 +11,9 @@ import (
 
 	"github.com/charmbracelet/x/term"
 
-	"woma/internal/config"
-	"woma/internal/core"
-	"woma/internal/tui"
+	"github.com/carlosrberto/woma/internal/config"
+	"github.com/carlosrberto/woma/internal/core"
+	"github.com/carlosrberto/woma/internal/tui"
 )
 
 func runClean(args []string, cfg config.Config, stdin io.Reader, stdout, stderr io.Writer) error {

@@ -10,8 +10,8 @@ import (
 	"slices"
 	"strings"
 
-	"woma/internal/config"
-	"woma/internal/git"
+	"github.com/carlosrberto/woma/internal/config"
+	"github.com/carlosrberto/woma/internal/git"
 )
 
 // CreateOptions configure CreateWorktree.

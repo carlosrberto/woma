@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"woma/internal/testutil"
+	"github.com/carlosrberto/woma/internal/testutil"
 )
 
 func TestMain(m *testing.M) {

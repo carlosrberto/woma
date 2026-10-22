@@ -10,10 +10,10 @@ import (
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 
-	"woma/internal/config"
-	"woma/internal/fsutil"
-	"woma/internal/git"
-	"woma/internal/testutil"
+	"github.com/carlosrberto/woma/internal/config"
+	"github.com/carlosrberto/woma/internal/fsutil"
+	"github.com/carlosrberto/woma/internal/git"
+	"github.com/carlosrberto/woma/internal/testutil"
 )
 
 func TestMain(m *testing.M) {
