@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.1] - 2026-10-22
+
+### Internal improvements
+
+- the formula installs prebuilt binaries from the release
+
+
 ## [0.1.0] - 2026-10-22
 
 ### Features

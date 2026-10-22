@@ -15,7 +15,7 @@ import (
 )
 
 // version is set by a release build: -ldflags "-X main.version=1.0.0".
-var version = "0.1.0"
+var version = "0.1.1"
 
 const usage = `woma: git worktree manager
 
