@@ -41,33 +41,29 @@ woma  ~/code
 
 ## Install
 
-With Homebrew (macOS and Linux):
+woma is built from source on your machine, so there's nothing to sign:
+macOS runs it without a security prompt.
+
+With Homebrew, on macOS or Linux (it gets Go to build woma, so it takes a
+minute or so):
 
 ```sh
 brew install carlosrberto/tap/woma
 ```
 
-Homebrew builds it from source (it gets Go for that), so it takes a
-minute or so, and macOS runs it without any security prompt. Or with Go
-1.24+:
+With Go 1.24+, on any system (puts `woma` in `$(go env GOPATH)/bin`):
 
 ```sh
-go install github.com/carlosrberto/woma@latest   # puts `woma` in $(go env GOPATH)/bin
+go install github.com/carlosrberto/woma@latest
 ```
-
-Or a binary from [the releases](https://github.com/carlosrberto/woma/releases)
-(macOS and Linux, amd64 and arm64; check it against `checksums.txt`). On
-macOS a binary your browser downloaded is quarantined and refused:
-`xattr -d com.apple.quarantine woma` allows it (`curl -LO` doesn't
-quarantine).
 
 From a clone (to try a change, or before a release), with Go 1.24+:
 
 ```sh
 git clone https://github.com/carlosrberto/woma && cd woma
-go install .                                  # puts `woma` in $(go env GOPATH)/bin
+make install                                  # same as go install .
 # or build it in place and link it onto your PATH:
-go build -o woma . && ln -sf "$PWD/woma" ~/.local/bin/woma
+make build && ln -sf "$PWD/woma" ~/.local/bin/woma
 ```
 
 `brew install --HEAD carlosrberto/tap/woma` builds the latest `main` with
@@ -396,13 +392,15 @@ install = ""
 ## Development
 
 ```sh
-go test ./...        # run the tests
+make setup           # once: git hooks (pre-push runs the tests)
+make test            # run the tests
+make check           # gofmt, go vet, shellcheck, then the tests
+make build           # build ./woma
 go run . ~/code      # run without installing
-go build -o woma .   # build the binary
 ```
 
-[docs/releasing.md](docs/releasing.md) covers making a release and the
-Homebrew formula.
+`make` lists every command. [docs/releasing.md](docs/releasing.md) covers
+making a release and the Homebrew formula.
 
 The tests never touch your repositories or settings: each one builds
 throwaway repositories (and remotes) in a temporary directory, and git runs

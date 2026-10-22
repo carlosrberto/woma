@@ -1,47 +1,51 @@
 # Releasing
 
-How a woma release is made: binaries for macOS and Linux (amd64, arm64)
-with checksums on GitHub, the Homebrew formula in
-[carlosrberto/homebrew-tap](https://github.com/carlosrberto/homebrew-tap),
-and `go install` working from the module. [.goreleaser.yaml](../.goreleaser.yaml)
-is the binaries' configuration; [scripts/formula.sh](../scripts/formula.sh)
-writes the formula.
+A release is a tag, a GitHub release with notes from
+[CHANGELOG.md](../CHANGELOG.md), and the Homebrew formula in
+[carlosrberto/homebrew-tap](https://github.com/carlosrberto/homebrew-tap).
+`make` does all of it.
 
-Homebrew builds woma from the tag's source archive (it brings Go to build
-it): a binary built on the machine isn't quarantined, so macOS runs it
-without it being signed or notarized. The release's binaries are for
-Linux, and for direct downloads.
+There are no binaries: an unsigned binary is refused by macOS. Homebrew
+builds woma from the tag's source archive instead (it brings Go to build
+it), and a binary built on the machine runs without being signed or
+notarized. `go install` builds from source too.
 
 ## Once
 
-1. **The tap**: clone `carlosrberto/homebrew-tap` next to this repo
-   (`gh repo clone carlosrberto/homebrew-tap`). The formula is
-   `Formula/woma.rb` in it; `brew install carlosrberto/tap/woma` finds it
-   there. Both repos must be public: a private repo's source archives
-   need a token, so `brew install` fails.
-2. **goreleaser** (only for the release's binaries): `brew install
-   goreleaser`. `goreleaser check` validates the config.
+1. Clone the tap next to this repo: `gh repo clone carlosrberto/homebrew-tap`
+   (or set `TAP=path/to/it`). Both repos must be public: a private repo's
+   source archives need a token, so `brew install` fails.
+2. `make setup`: the pre-push hook runs the tests on every push.
+3. `gh` logged in with the `carlosrberto` account (`gh auth login`).
+   Releases use it whichever account is active; `GH_USER=other` changes
+   it, `GH_USER=` uses the active one.
 
 ## A release
 
-1. `go test -race ./...` and `go vet ./...`.
-2. Set `version` in `main.go` to the new version (it's what a
-   `go install` build says), commit.
-3. Tag and push: `git tag v0.1.0 && git push origin v0.1.0`.
-4. `GITHUB_TOKEN=... goreleaser release --clean`: it runs the tests,
-   builds, and writes the release - as a **draft**.
-5. Look at the draft on GitHub (the changelog is grouped from the commits'
-   types), then publish it.
-6. The formula, for the tag (its source archive exists once the tag is
-   pushed):
+```sh
+make bump-patch    # or bump-minor, bump-major; skip it for the first release (0.1.0)
+make prepare       # checks, adds the CHANGELOG.md section, commits "chore(release): vX"
+make release       # tags, pushes, creates the GitHub release, updates the formula
+```
 
-   ```sh
-   scripts/formula.sh v0.1.0 > ../homebrew-tap/Formula/woma.rb
-   cd ../homebrew-tap && git add Formula/woma.rb && git commit -m "woma 0.1.0" && git push
-   ```
+- `make bump-*` sets `version` in `main.go`.
+- `make prepare` runs `make check`, then writes the CHANGELOG.md section
+  from the commits since the last tag, grouped by their conventional
+  commit type (`make release-notes` shows it beforehand). Edit the
+  section before releasing if you like: amend the commit.
+- `make release` refuses unless HEAD is the release commit, the tree is
+  clean and the tag is new. One push sends main and the annotated tag (so
+  the tests run once), then `gh release create` with the notes, then
+  `scripts/formula.sh` writes `Formula/woma.rb` into the tap, which is
+  committed and pushed.
 
-   `brew install carlosrberto/tap/woma` then `brew test woma` try it;
-   `brew audit --strict carlosrberto/tap/woma` checks the formula.
+Then `brew upgrade woma` (or `brew install carlosrberto/tap/woma`) and
+`brew test woma` try it; `brew audit --strict carlosrberto/tap/woma`
+checks the formula.
 
-`goreleaser release --snapshot --clean --skip=publish` does all of it into
-`dist/` without a tag or publishing anything - to try the config.
+`make undo-release` undoes the last one: deletes the GitHub release and
+the tag, drops the release commit (force-pushing main with a lease), and
+reverts the formula in the tap.
+
+`make formula` prints the formula for the current version's tag, without
+writing anything.

@@ -1,0 +1,19 @@
+#!/bin/sh
+#
+# Pre-push hook — run the test suite and block the push if it fails.
+#
+# Installed by `make hooks` (also run by `make setup`), which points
+# core.hooksPath at the tracked .githooks/ directory.
+#
+# Bypass in a pinch with:  git push --no-verify
+#
+# Git runs this from the top level of the working tree, where the Makefile
+# lives — so `make test` resolves correctly (including in worktrees).
+
+echo "▶ Running tests before push (make test)…"
+if ! make test; then
+    echo "" >&2
+    echo "✗ Tests failed — push aborted." >&2
+    echo "  Fix the tests, or bypass intentionally with: git push --no-verify" >&2
+    exit 1
+fi
