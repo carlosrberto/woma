@@ -131,7 +131,7 @@ type Options struct {
 	Pick bool
 	// Multi (with Pick) allows selecting several worktrees to pick.
 	Multi bool
-	// Now overrides the clock, for tests.
+	// Now overrides the clock, for tests and WOMA_NOW.
 	Now func() time.Time
 }
 

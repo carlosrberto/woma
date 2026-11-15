@@ -22,10 +22,15 @@ mkdir -p "$OUT"
 NOW=1780315200 # 2026-06-01T12:00:00Z
 H=3600 D=86400
 
-V() { tmux -L womatest-shots -f "$WORK/tmux.conf" "$@"; }
+# Its own tmux server per run: one left from another run would keep that
+# run's environment (HOME, WOMA_CONFIG) and config.
+V() { tmux -L "womatest-shots-$$" -f "$WORK/tmux.conf" "$@"; }
 # shellcheck disable=SC2317,SC2329 # invoked by the trap
 cleanup() {
+  local socket
+  socket="$(V display-message -p '#{socket_path}' 2>/dev/null)" || true
   V kill-server 2>/dev/null || true
+  [ -z "$socket" ] || rm -f "$socket"
   if [ -n "${KEEP:-}" ]; then echo "kept $WORK" >&2; else rm -rf "$WORK"; fi
 }
 trap cleanup EXIT
@@ -33,6 +38,10 @@ go build -o "$WORK/render" "$ROOT/scripts/render" # before HOME moves: your Go c
 
 # --- The fixture ---
 
+# A GIT_DIR or GIT_WORK_TREE from outside (a git hook) would point git at
+# another repository.
+# shellcheck disable=SC2046 # one name per word
+unset $(git rev-parse --local-env-vars)
 export HOME="$WORK/home" WOMA_CONFIG="$WORK/config.toml" WOMA_NOW=2026-06-01T12:00:00Z
 export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
 export GIT_AUTHOR_NAME="Dev" GIT_AUTHOR_EMAIL="dev@example.com" GIT_COMMITTER_NAME="Dev" GIT_COMMITTER_EMAIL="dev@example.com"
@@ -144,7 +153,7 @@ wait_screen() {
   screen >&2
   exit 1
 }
-# settled: until the screen stops changing.
+# settled: until the screen stops changing, 10 s at most.
 settled() {
   local a b
   a="$(V capture-pane -e -p -t s)"
@@ -154,13 +163,16 @@ settled() {
     [ "$a" = "$b" ] && return 0
     a="$b"
   done
+  echo "screenshots: the screen kept changing:" >&2
+  screen >&2
+  exit 1
 }
 # loaded: until woma has listed, checked and measured every worktree.
 loaded() {
   wait_screen "worktrees in 2 repositories"
+  wait_screen "scanning" lacks
   wait_screen "checking git" lacks
   wait_screen "measuring" lacks
-  wait_screen "…" lacks
   settled
 }
 # key <key>: one key, then the screen caught up (Bubble Tea merges fast keys).
