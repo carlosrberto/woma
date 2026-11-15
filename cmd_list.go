@@ -84,7 +84,7 @@ func collect(roots []string, cfg config.Config, filter core.Filter, stderr io.Wr
 		total += len(r.Worktrees)
 	}
 
-	now := time.Now()
+	now := now()
 	var entries []core.Entry
 	core.InspectAll(ctx, repos, func(e core.Entry) {
 		inspected++
@@ -156,7 +156,7 @@ func runList(args []string, cfg config.Config, stdout, stderr io.Writer) error {
 		return err
 	}
 
-	now := time.Now()
+	now := now()
 	stale := cfg.StaleDuration()
 	if *asJSON {
 		out := make([]jsonEntry, 0, len(entries))

@@ -16,6 +16,7 @@ make build                 # ./woma (~/.local/bin/woma links to it)
 make check                 # gofmt, go vet, staticcheck, shellcheck, race tests
 go test ./internal/git -run TestInspectFreshBranchFromRemoteBase   # one test
 go run . ~/code            # the TUI without installing
+make screenshots           # docs/screenshots, from made-up repos (scripts/screenshots.sh)
 make                       # every target, including the release ones
 ```
 
@@ -51,7 +52,8 @@ Needs Go 1.24+, git, shellcheck, staticcheck.
   Keep new checks on that side.
 - **Docs change with the code**, in the same commit: the README (commands,
   flags, keys, labels, config, `--json` fields), the usage text in
-  `main.go`, `docs/releasing.md` for the release flow. Describe what woma
+  `main.go`, `docs/releasing.md` for the release flow, the screenshots
+  (`make screenshots`) when what they show changes. Describe what woma
   does now; history belongs in git.
 
 ## Architecture

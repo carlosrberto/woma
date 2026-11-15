@@ -7,7 +7,6 @@ import (
 	"os"
 	"strings"
 	"sync/atomic"
-	"time"
 
 	"github.com/charmbracelet/x/term"
 
@@ -44,7 +43,7 @@ func runClean(args []string, cfg config.Config, stdin io.Reader, stdout, stderr 
 		return err
 	}
 
-	now := time.Now()
+	now := now()
 	stale := cfg.StaleDuration()
 	var targets []core.Entry
 	var total int64

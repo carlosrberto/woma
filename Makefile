@@ -12,6 +12,7 @@
 #   make build          Build ./woma (what ~/.local/bin/woma can link to)
 #   make test           Run the tests (race detector on)
 #   make check          gofmt, go vet, staticcheck, shellcheck, then the tests
+#   make screenshots    The README's screenshots (docs/screenshots), from made-up repos
 #
 # VERSIONING:
 #   make version        Show the current version
@@ -61,6 +62,9 @@ lint: ## gofmt, go vet, staticcheck and shellcheck
 	shellcheck scripts/*.sh .githooks/pre-push
 
 check: lint test ## Lint, then test
+
+screenshots: build ## The README's screenshots (docs/screenshots), from made-up repos
+	scripts/screenshots.sh
 
 dist: ## Build the release archives and checksums.txt into dist/
 	@rm -rf dist && mkdir -p dist
@@ -158,5 +162,5 @@ hooks: ## Install git hooks (pre-push runs the tests)
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-14s\033[0m %s\n", $$1, $$2}'
 
-.PHONY: build install test lint check dist release-notes prepare release undo-release formula bump-patch bump-minor bump-major version setup hooks help
+.PHONY: build install test lint check screenshots dist release-notes prepare release undo-release formula bump-patch bump-minor bump-major version setup hooks help
 .DEFAULT_GOAL := help

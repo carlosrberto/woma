@@ -18,7 +18,7 @@ func runBrowse(args []string, cfg config.Config, stdout, stderr io.Writer) error
 	if err != nil {
 		return err
 	}
-	m, err := runTUI(paths, cfg, tui.Options{}, os.Stdout)
+	m, err := runTUI(paths, cfg, tui.Options{Now: now}, os.Stdout)
 	if err != nil {
 		return err
 	}
@@ -38,7 +38,7 @@ func runPick(args []string, cfg config.Config, stdout, stderr io.Writer) error {
 		return err
 	}
 	tui.UseOutput(os.Stderr)
-	m, err := runTUI(paths, cfg, tui.Options{Pick: true, Multi: *multi}, os.Stderr)
+	m, err := runTUI(paths, cfg, tui.Options{Pick: true, Multi: *multi, Now: now}, os.Stderr)
 	if err != nil {
 		return err
 	}

@@ -1,0 +1,175 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980.8 498" width="980.8" height="498" role="img" aria-label="woma pick">
+<rect width="980.8" height="498" rx="10" fill="#1a1b26"/>
+<rect width="980.8" height="498" rx="10" fill="none" stroke="#333545"/>
+<circle cx="20" cy="20" r="6" fill="#ff5f57"/>
+<circle cx="40" cy="20" r="6" fill="#febc2e"/>
+<circle cx="60" cy="20" r="6" fill="#28c840"/>
+<text x="490.4" y="24" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'DejaVu Sans Mono', monospace" font-size="13" fill="#7e84a2">woma pick</text>
+<g transform="translate(20 46)" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'DejaVu Sans Mono', monospace" font-size="14">
+<text x="0" y="13.32" textLength="42" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#ff87d7" font-weight="bold">woma </text>
+<text x="42" y="13.32" textLength="100.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#808080">pick  ~/code</text>
+<text x="0" y="31.32" textLength="319.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#808080">7 worktrees in 2 repositories · 2.6 MB</text>
+<text x="8.4" y="67.32" textLength="84" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#00afff" font-weight="bold">acme-api  </text>
+<text x="92.4" y="67.32" textLength="168" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#808080">4 worktrees · 2.1 MB</text>
+<text x="16.8" y="85.32" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#ff87d7" font-weight="bold">▸ </text>
+<text x="33.6" y="85.32" textLength="201.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#c0caf5" font-weight="bold">.worktrees/feat-login   </text>
+<text x="235.2" y="85.32" textLength="201.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#808080">feat/login       2h     </text>
+<text x="436.8" y="85.32" textLength="226.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#ffaf00">2.0 MB  modified 1 unpushed</text>
+<text x="33.6" y="103.32" textLength="201.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#c0caf5">.worktrees/feat-search  </text>
+<text x="235.2" y="103.32" textLength="193.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#808080">feat/search      1d    </text>
+<text x="428.4" y="103.32" textLength="75.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#ffaf00">12.0 KB  </text>
+<text x="504" y="103.32" textLength="58.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#ff0000">locked </text>
+<text x="562.8" y="103.32" textLength="84" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#808080">no commits</text>
+<text x="33.6" y="121.32" textLength="201.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#c0caf5">.worktrees/fix-typo     </text>
+<text x="235.2" y="121.32" textLength="193.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#808080">fix/typo         3w    </text>
+<text x="428.4" y="121.32" textLength="75.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#ffaf00">12.0 KB  </text>
+<text x="504" y="121.32" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#00d787">merged</text>
+<text x="33.6" y="139.32" textLength="201.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#c0caf5">.worktrees/old-spike    </text>
+<text x="235.2" y="139.32" textLength="193.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#808080">spike/cache     4mo    </text>
+<text x="428.4" y="139.32" textLength="168" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#ffaf00">12.0 KB  1 unpushed </text>
+<text x="596.4" y="139.32" textLength="42" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#00d787">gone </text>
+<text x="638.4" y="139.32" textLength="42" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#808080">stale</text>
+<text x="8.4" y="157.32" textLength="75.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#00afff" font-weight="bold">web-app  </text>
+<text x="84" y="157.32" textLength="184.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#808080">3 worktrees · 540.0 KB</text>
+<text x="33.6" y="175.32" textLength="201.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#c0caf5">.worktrees/docs-setup   </text>
+<text x="235.2" y="175.32" textLength="193.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#808080">docs/setup       2w    </text>
+<text x="428.4" y="175.32" textLength="75.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#ffaf00">16.0 KB  </text>
+<text x="504" y="175.32" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#00d787">merged</text>
+<text x="33.6" y="193.32" textLength="201.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#c0caf5">.worktrees/old-demo     </text>
+<text x="235.2" y="193.32" textLength="420" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#808080">demo/old         2w          —  missing no commits</text>
+<text x="33.6" y="211.32" textLength="201.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#c0caf5">web-app-redesign        </text>
+<text x="235.2" y="211.32" textLength="184.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#808080">feat/redesign    1d   </text>
+<text x="420" y="211.32" textLength="243.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#ffaf00">524.0 KB  modified 1 unpushed</text>
+<path d="M0 243H8.4" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M8.4 243H16.8" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M16.8 243H25.2" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M25.2 243H33.6" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M33.6 243H42" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M42 243H50.4" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M50.4 243H58.8" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M58.8 243H67.2" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M67.2 243H75.6" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M75.6 243H84" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M84 243H92.4" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M92.4 243H100.8" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M100.8 243H109.2" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M109.2 243H117.6" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M117.6 243H126" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M126 243H134.4" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M134.4 243H142.8" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M142.8 243H151.2" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M151.2 243H159.6" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M159.6 243H168" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M168 243H176.4" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M176.4 243H184.8" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M184.8 243H193.2" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M193.2 243H201.6" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M201.6 243H210" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M210 243H218.4" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M218.4 243H226.8" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M226.8 243H235.2" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M235.2 243H243.6" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M243.6 243H252" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M252 243H260.4" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M260.4 243H268.8" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M268.8 243H277.2" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M277.2 243H285.6" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M285.6 243H294" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M294 243H302.4" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M302.4 243H310.8" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M310.8 243H319.2" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M319.2 243H327.6" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M327.6 243H336" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M336 243H344.4" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M344.4 243H352.8" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M352.8 243H361.2" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M361.2 243H369.6" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M369.6 243H378" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M378 243H386.4" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M386.4 243H394.8" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M394.8 243H403.2" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M403.2 243H411.6" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M411.6 243H420" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M420 243H428.4" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M428.4 243H436.8" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M436.8 243H445.2" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M445.2 243H453.6" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M453.6 243H462" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M462 243H470.4" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M470.4 243H478.8" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M478.8 243H487.2" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M487.2 243H495.6" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M495.6 243H504" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M504 243H512.4" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M512.4 243H520.8" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M520.8 243H529.2" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M529.2 243H537.6" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M537.6 243H546" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M546 243H554.4" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M554.4 243H562.8" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M562.8 243H571.2" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M571.2 243H579.6" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M579.6 243H588" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M588 243H596.4" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M596.4 243H604.8" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M604.8 243H613.2" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M613.2 243H621.6" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M621.6 243H630" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M630 243H638.4" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M638.4 243H646.8" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M646.8 243H655.2" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M655.2 243H663.6" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M663.6 243H672" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M672 243H680.4" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M680.4 243H688.8" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M688.8 243H697.2" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M697.2 243H705.6" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M705.6 243H714" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M714 243H722.4" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M722.4 243H730.8" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M730.8 243H739.2" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M739.2 243H747.6" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M747.6 243H756" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M756 243H764.4" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M764.4 243H772.8" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M772.8 243H781.2" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M781.2 243H789.6" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M789.6 243H798" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M798 243H806.4" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M806.4 243H814.8" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M814.8 243H823.2" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M823.2 243H831.6" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M831.6 243H840" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M840 243H848.4" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M848.4 243H856.8" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M856.8 243H865.2" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M865.2 243H873.6" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M873.6 243H882" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M882 243H890.4" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M890.4 243H898.8" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M898.8 243H907.2" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M907.2 243H915.6" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M915.6 243H924" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M924 243H932.4" fill="none" stroke="#808080" stroke-width="1.2"/>
+<path d="M932.4 243H940.8" fill="none" stroke="#808080" stroke-width="1.2"/>
+<text x="0" y="265.32" textLength="75.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#808080"> path    </text>
+<text x="75.6" y="265.32" textLength="310.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#c0caf5">~/code/acme-api/.worktrees/feat-login</text>
+<text x="8.4" y="283.32" textLength="67.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#808080">branch  </text>
+<text x="75.6" y="283.32" textLength="268.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#c0caf5">feat/login → origin/feat/login  </text>
+<text x="344.4" y="283.32" textLength="142.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#808080">ahead 1, behind 0</text>
+<text x="0" y="301.32" textLength="75.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#808080"> state   </text>
+<text x="75.6" y="301.32" textLength="151.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#ffaf00">1 commit unpushed </text>
+<text x="226.8" y="301.32" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#808080">· </text>
+<text x="243.6" y="301.32" textLength="117.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#ffaf00">1 changed file</text>
+<text x="8.4" y="319.32" textLength="67.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#808080">commit  </text>
+<text x="75.6" y="319.32" textLength="201.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#c0caf5">validate the login form </text>
+<text x="277.2" y="319.32" textLength="67.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#808080">· 2h ago</text>
+<text x="0" y="337.32" textLength="75.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#808080"> active  </text>
+<text x="75.6" y="337.32" textLength="58.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#c0caf5">2h ago </text>
+<text x="134.4" y="337.32" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#808080">· </text>
+<text x="151.2" y="337.32" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#c0caf5">2.0 MB</text>
+<text x="8.4" y="355.32" textLength="67.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#808080">changes </text>
+<text x="75.6" y="355.32" textLength="92.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#c0caf5">?? notes.md</text>
+<text x="0" y="427.32" textLength="571.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve" fill="#808080">↑/↓ move · / search · s sort (name) · enter pick · ? help · q cancel</text>
+</g>
+</svg>

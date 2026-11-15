@@ -5,27 +5,7 @@
 worktree across your repositories, tells you which ones are done with, cleans
 them up, creates new ones the way you like, and jumps between them.
 
-```
-woma  ~/code
-4 worktrees in 2 repositories · 38.2 MB
-
- api  3 worktrees · 38.2 MB
-  ▸ [ ] .worktrees/feature-login  feature-login    2h    38.2 MB  modified 1 unpushed
-    [x] .worktrees/fix-typo       fix-typo         3w     8.0 KB  merged
-    [x] .worktrees/old-spike      old-spike        4mo    8.0 KB  gone stale
- web  1 worktree · 4.0 KB
-    [ ] web-redesign              redesign         1d     4.0 KB  locked no commits
-──────────────────────────────────────────────────────────────────────────────
- path    ~/code/api/.worktrees/feature-login
- branch  feature-login  no upstream
- state   1 commit unpushed · 1 changed file
- commit  add login form · 2h ago
- active  2h ago · 38.2 MB
- changes ?? data.bin
-
- 2 selected · 16.0 KB
-↑/↓ move · space select · m select safe · / search · s sort (name) · enter delete · ? help · q quit
-```
+![woma browsing the worktrees under ~/code, the safe ones selected](docs/screenshots/browser.svg)
 
 ## Contents
 
@@ -148,6 +128,8 @@ Press `b` on that screen to **also delete the branches**. Only branches that
 are merged into the default branch or fully pushed are deleted; branches with
 unpushed commits are kept and marked as such. Press `y` to go ahead.
 
+![The delete confirmation, with branches](docs/screenshots/delete.svg)
+
 While deleting, woma shows an overall progress bar (space freed so far) and a
 bar per worktree; up to three are removed in parallel. `ctrl+c` is disabled
 until it finishes. When you quit, it prints how many worktrees it removed and
@@ -213,6 +195,8 @@ the cursor and exits. Nothing else goes to stdout, so it works in `$(...)`.
 cd "$(woma pick ~/code)"
 ```
 
+![woma pick](docs/screenshots/pick.svg)
+
 There are no checkboxes, and everything that changes worktrees (delete,
 clean, lock, move, repair, open) is disabled, so a stray key can't do
 damage. Quitting with `q` prints nothing and exits with an error, so
@@ -271,6 +255,8 @@ the browser. Accepts the filters below.
 woma list ~/code --stale
 woma list --json | jq '.[] | select(.safe) | .path'
 ```
+
+![woma list --safe](docs/screenshots/list.svg)
 
 JSON fields: `repo`, `repo_path`, `path`, `branch`, `head`, `upstream`,
 `size` (bytes), `last_activity`, `merged`, `no_commits`, `gone`, `stale`, `dirty`,
@@ -399,8 +385,16 @@ make setup           # once: git hooks (pre-push runs the tests)
 make test            # run the tests
 make check           # gofmt, go vet, staticcheck, shellcheck, then the tests
 make build           # build ./woma
+make screenshots     # the README's screenshots (docs/screenshots)
 go run . ~/code      # run without installing
 ```
+
+`make screenshots` builds made-up repositories in a temporary directory
+(with their own `HOME`, git config and woma config), runs woma on a
+throwaway tmux server and draws each screen as an SVG
+(`scripts/screenshots.sh`, `scripts/render`). `WOMA_NOW` (an RFC 3339
+time) freezes woma's clock, so ages and labels come out the same on every
+run.
 
 `make` lists every command. [docs/releasing.md](docs/releasing.md) covers
 making a release and the Homebrew formula.
